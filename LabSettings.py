@@ -1,5 +1,5 @@
 #set communications port. On Raspbian for USB-to-serial it should be /dev/ttyUSB0 (check dmesg immediately after connecting USB), default = /dev/ttyUSB0
-T3311port = '/dev/ttyUSB0'
+instrport = '/dev/ttyUSB0'
 
 ## ///////////////////////////USER PREFERENCES\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 #display pixels per inch for 5", 800x480 display, default is 186 px/in^2
@@ -13,12 +13,15 @@ TincSet = 5
 RHincSet = 10
 
 ## Graphing settings
+#figure size of the graphs in inches. Default values are for using a 800x480 pixel 5" display.
+figsize_x = 4.2
+figsize_y = 2.2
 #number of points to record per hour, default is 40 pt/hr (every 90 seconds)
-pts_per_hr = 40
+pts_hr = 40
 #length of time to graph into past, hours, default is 12 hours
-graph_time = 12
+graphtime = 12
 #number of points between each x-axis tickmark, default is 20 points per tick
-tick_spacing = 20
+tickspacing = 20
 #amount of space to graph above maximum temperature in graph time range, deg. C
 graphTmax = 0.5
 #amount of space to graph below minimum temperature in graph time range, deg. C
