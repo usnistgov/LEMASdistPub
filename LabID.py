@@ -1,3 +1,2 @@
-## ///////////////////////ONLY CHANGE THIS BETWEEN LABS\\\\\\\\\\\\\\\\\\\\\\\\\
-#assigned lab for this device, set as a string
-labID = ''
+#assigned lab identification for this device. format at NIST is <building number>/<lab number>. set as a string
+labID = '219/G032'

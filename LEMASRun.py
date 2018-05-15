@@ -15,15 +15,14 @@
 #
 #///////////////////////////////////////////////////////////////////////////////
 ## References
-#   Common cell carrier gateways
-#   mostly complete list: https://martinfitzpatrick.name/list-of-email-to-sms-gateways/
+#       none
 #
 ##///////////////////////////////////////////////////////////////////////////////
 ## Change log from v1.11 to v1.12
 #   May 10, 2018
 #
-#   ver 1.12    - moved server information into .py file to easily edit for public distribution
-#               - moved instrument interface into .py file for easily editing for public distribution
+#   ver 1.12    - moved server information into .py file to easily edit in the public distribution
+#               - moved instrument interface into .py file to  easily edit in the public distribution
 #
 #///////////////////////////////////////////////////////////////////////////////
 
@@ -49,16 +48,21 @@ from LabID import labID
 from SensorSerial import sensorserial
 from Tcontrols import Tcontrols
 from RHcontrols import RHcontrols
+from corrections import corrections
+
 from Contacts import allcontacts
 from Contacts import labusers
+
 from testmsgdate import TestmsgDate
-from corrections import corrections
+from testmsgdate import Testmsg
+
 from ServerInfo import SMTPaddress
 from ServerInfo import SMTPport
 from ServerInfo import logaddress
 from ServerInfo import fromaddress
 from ServerInfo import username
 from ServerInfo import passwd
+
 from LabSettings import instrport
 from LabSettings import pts_hr
 from LabSettings import graphtime
@@ -113,7 +117,7 @@ ethoutage_sent = False                                                          
 
 #///////////////////////////Function Definitions\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 #define message sending functions
-def SendMessage(toaddress, message):                                            #method for sending regular messages
+def SendMessage(toaddress, message):                                            #function for sending regular messages
     msg = MIMEMultipart()                                                       #define msg as having multiple components
     msg['Subject'] = 'DMG Alert: '+labID+' event log'
     msg['From'] = fromaddress
@@ -135,7 +139,7 @@ def SendMessage(toaddress, message):                                            
     server.sendmail('dmgalert@nist.gov', toaddress, msg.as_string())
     server.quit()
 
-def SendMessageMMS(toaddress, message, img_path):                               #method for sending messages with image attached
+def SendMessageMMS(toaddress, message, img_path):                               #function for sending messages with image attached
     msg = MIMEMultipart()                                                       #define msg as having multiple components
     msg['Subject'] = 'DMG Alert: '+labID+' Environment Event'
     msg['From'] = fromaddress
@@ -414,7 +418,7 @@ while True:
     comparetime = datetime.datetime.strptime(time.strftime("%B %d, %Y %H:%M:%S"), "%B %d, %Y %H:%M:%S")
     if (TestmsgDate-comparetime) < datetime.timedelta(0,30*60) and (TestmsgDate-comparetime) > datetime.timedelta(0,0): #if 30 minutes prior to sending test message
         if not(TestmsgSent):                                                    #if test message has not been sent
-            message = 'DMGalert test: This is a scheduled test message of the NIST Laboratory Environment Monitoring and Alert System stationed in '+labID+'. No action is needed for this message. The current system time is '+time.strftime('%a %b %d, %Y, %I.%M %p')+'. The current environment for '+labID+' is %.2f' % temperature[-1]+' deg. C and %.2f' % humidity[-1]+' RH.'
+            message = Testmsg+labID+'. The current system time is '+time.strftime('%a %b %d, %Y, %I.%M %p')+'. The current environment is %.2f' % temperature[-1]+' deg. C and %.2f' % humidity[-1]+' RH.'
             plt.savefig(program_directory+'/tmpimg/outage.jpg')                 #save current figure
             for naddress in range(len(labcontacts)):
                 SendMessageMMS(labcontacts, message, program_directory+'/tmpimg/outage.jpg') #send test message with attached graph

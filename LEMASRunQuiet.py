@@ -1,37 +1,36 @@
-#LEMASRun.py
+#LEMASRunQuiet.py
 #   Tested with Python 3.6.1 (Anaconda 4.4.0 stack) on Linux Mint 18.2 Sonya Cinnamon, Python 3.4.2, on Raspbian Linux
 #
 #///////////////////////////////////////////////////////////////////////////////
-## LEMASRun.py Notes
+## LEMASRunQuiet.py Notes
 #   August, 2017
 #   Authored by: Michael Braine, Physical Science Technician, NIST, Gaithersburg, MD
 #       PHONE: 301 975 8746
 #       EMAIL: michael.braine@nist.gov (use this instead of phone)
 #
 #   Purpose
-#       continuously read temperature and humidity from CometSystems T3311, send notification via text/email with graph attached to lab users if temperature or humidity is outside of specified limits
+#       continuously read temperature and humidity from instrument
 #       log temperature and humidity to <month><YYYY>-all.env.csv
 #       log temperature and humidity outages to <month><YYYY>-outage.env.csv
 #
 #///////////////////////////////////////////////////////////////////////////////
 ## References
-# smtp.nist.gov is at ip: 129.6.16.94
-#
-#   T3311 manual (T3311manual.pdf)
-#   T3311 protocols (T3311protocols.pdf)
-#
-#   Common cell carrier gateways
-#   mostly complete list: https://martinfitzpatrick.name/list-of-email-to-sms-gateways/
+#       none
 #
 ##///////////////////////////////////////////////////////////////////////////////
-## Change log from v1.10 to v1.11
-#   April 25, 2018
+## Change log from v1.11 to v1.12
+#   May 10, 2018
 #
-#   ver 1.11    - fixed issues with recording outage type to outage file
+#   ver 1.12    - moved server information into .py file to easily edit in the public distribution
+#               - moved instrument interface into .py file to  easily edit in the public distribution
 #
 #///////////////////////////////////////////////////////////////////////////////
 
-## Used libraries
+print('\n'+time.strftime("%Y-%m-%d %H:%M:%S")+' : Starting Laboratory Environment Monitoring and Alert System (LEMAS), v1.12, May 2018')
+print('\n\nMichael Braine, August 2017\nmichael.braine@nist.gov')
+print('\n\nQuiet Mode')
+
+## import python libraries
 import smtplib, time, os, csv, datetime, copy
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
@@ -41,59 +40,65 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
-## Import lab settings files
 program_directory = '/home/pi/LEMASdist'
-#program_directory = '/home/braine/BraineCode/LEMASmaster/LEMASdist'
 os.chdir(program_directory)
-import LabID
-import Tcontrols
-import RHcontrols
-import corrections
-import SensorSerial
-import LabSettings
-import Contacts
-import testmsgdate                                                              #import test message date with each loop, in case test message date changes
+
+#//////////////////////////Import various configurations\\\\\\\\\\\\\\\\\\\\\\\\
+from LabID import labID
+from SensorSerial import sensorserial
+from Tcontrols import Tcontrols
+from RHcontrols import RHcontrols
+from corrections import corrections
+
+from Contacts import allcontacts
+from Contacts import labusers
+
+from testmsgdate import TestmsgDate
+from testmsgdate import Testmsg
+
+from ServerInfo import SMTPaddress
+from ServerInfo import SMTPport
+from ServerInfo import logaddress
+from ServerInfo import fromaddress
+from ServerInfo import username
+from ServerInfo import passwd
+
+from LabSettings import instrport
+from LabSettings import pts_hr
+from LabSettings import graphtime
+from LabSettings import tickspacing
+from LabSettings import dpi_set
+from LabSettings import normalstatus_wait
+from LabSettings import TincSet
+from LabSettings import RHincSet
+from LabSettings import graphTmax
+from LabSettings import graphTmin
+from LabSettings import graphRHmax
+from LabSettings import graphRHmin
+from LabSettings import FontsizeLabel
+from LabSettings import FontsizeYticks
+from LabSettings import FontsizeXticks
+from LabSettings import GraphLinewidth
+from LabSettings import rereadT
+from LabSettings import rereadRH
+from LabSettings import figsize_x
+from LabSettings import figsize_y
+
+#//////////////////////////Import instrument interface\\\\\\\\\\\\\\\\\\\\\\\\\\
+from InstrInterface import ConnectInstr
+from InstrInterface import Instr_errfix
+from InstrInterface import ReadTemperature
+from InstrInterface import ReadHumidity
+
 os.chdir(program_directory+'/tmpimg')
 
-#//////////////////////////Import LabSettings\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
-## import settings from LabSettings.py
-logemail = 'dmgalert@nist.gov'
-labID = LabID.labID
-sensorserial = SensorSerial.sensorserial
-Tcontrols = Tcontrols.Tcontrols
-RHcontrols = RHcontrols.RHcontrols
-T3311port = LabSettings.T3311port
-pts_per_hr = LabSettings.pts_per_hr
-graph_time = LabSettings.graph_time
-tick_spacing = LabSettings.tick_spacing
-dpi_set = LabSettings.dpi_set
-normalstatus_wait = LabSettings.normalstatus_wait
-TincSet = LabSettings.TincSet
-RHincSet = LabSettings.RHincSet
-graphTmax = LabSettings.graphTmax
-graphTmin = LabSettings.graphTmin
-graphRHmax = LabSettings.graphRHmax
-graphRHmin = LabSettings.graphRHmin
-FontsizeLabel = LabSettings.FontsizeLabel
-FontsizeYticks = LabSettings.FontsizeYticks
-FontsizeXticks = LabSettings.FontsizeXticks
-GraphLinewidth = LabSettings.GraphLinewidth
-rereadT = LabSettings.rereadT
-rereadRH = LabSettings.rereadRH
-allcontacts = Contacts.allcontacts
-labusers = copy.deepcopy(Contacts.labusers[labID])
-correction = copy.deepcopy(corrections.correction[sensorserial])                #[temperature, humidity]
-TestmsgDate = testmsgdate.TestmsgDate
+correction = copy.deepcopy(corrections.corrections[sensorserial])               #[temperature, humidity]
 TestmsgDate = datetime.datetime.strptime(TestmsgDate, "%B %d, %Y %H:%M:%S")
-
-print('\n'+time.strftime("%Y-%m-%d %H:%M:%S")+' : Starting NIST Laboratory Environment Monitoring and Alert System (LEMAS), v1.11, October 2017')
-print('\n\nMichael Braine, August 2017\nCurator contact: michael.braine@nist.gov')
-print('\n\nQuiet Mode')
 
 #///////////////////////////Outage Parameter Setup\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 #set up parameters
-graph_pts = round(graph_time*pts_per_hr)                                        #maximum number of recent points to plot
-sleeptimer = (pts_per_hr / 60 / 60)**-1                                         #amount of time for system to wait until next temperature, seconds
+graph_pts = round(graphtime*pts_hr)                                             #maximum number of recent points to plot
+sleeptimer = (pts_hr / 60 / 60)**-1                                             #amount of time for system to wait until next temperature, seconds
 Tmin = Tcontrols[labID][0]                                                      #get lower temperature limit for assigned lab
 Tmax = Tcontrols[labID][1]                                                      #get upper temperature limit for assigned lab
 RHmin = RHcontrols[labID][0]                                                    #get lower humidity limit for assigned lab
@@ -110,35 +115,34 @@ TestmsgSent = False                                                             
 ethoutage = False                                                               #initialize with internet outage status as false
 ethoutage_sent = False                                                          #initialize status of messages queued under internet outage as not sent
 
-## NIST SMTP server credentials and settings
-#email = ''
-#passwd = ''
-#fromaddr = 'NIST Lab Environment Alert'
-#SMTPserver = 'smtp.nist.gov'
-#SMTPport = 25
-
-## GMail SMTP server settings
-#SMTPserver = 'smtp.gmail.com'
-#SMTPport = 587
-
 #///////////////////////////Function Definitions\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 #define message sending functions
-def SendMessage(toaddress, message):                                            #method for sending regular messages
+def SendMessage(toaddress, message):                                            #function for sending regular messages
     msg = MIMEMultipart()                                                       #define msg as having multiple components
     msg['Subject'] = 'DMG Alert: '+labID+' event log'
-    msg['From'] = 'dmgalert@nist.gov'
+    msg['From'] = fromaddress
     msg['To'] = toaddress
     text = MIMEText(message)
     msg.attach(text)
 
-    server = smtplib.SMTP('129.6.16.94', 25)
+    server = smtplib.SMTP(SMTPaddress, SMTPport)
+    try:
+        server.starttls()
+    except Exception:
+        print('Looks like your SMTP server may not support TLS. Continuing to send message without it.')
+    if len(username) != 0:
+        try:
+            server.login(username, passwd)
+        except Exception:
+            print('Either your username and/or password is incorrect, or you do not need to log in to your SMTP server to send messages.')
+            print('If a message is received, then no login is needed and you can leave username and password blank.')
     server.sendmail('dmgalert@nist.gov', toaddress, msg.as_string())
     server.quit()
 
-def SendMessageMMS(toaddress, message, img_path):                               #method for sending messages with image attached
+def SendMessageMMS(toaddress, message, img_path):                               #function for sending messages with image attached
     msg = MIMEMultipart()                                                       #define msg as having multiple components
     msg['Subject'] = 'DMG Alert: '+labID+' Environment Event'
-    msg['From'] = 'dmgalert@nist.gov'
+    msg['From'] = fromaddress
     msg['To'] = toaddress
     text = MIMEText(message)
     msg.attach(text)
@@ -146,55 +150,22 @@ def SendMessageMMS(toaddress, message, img_path):                               
     image_attach = MIMEImage(img_file)
     msg.attach(image_attach)
 
-    server = smtplib.SMTP('129.6.16.94', 25)
+    server = smtplib.SMTP(SMTPaddress, SMTPport)
+    try:
+        server.starttls()
+    except Exception:
+        print('Looks like your SMTP server may not support TLS. Continuing to send message without it.')
+    if len(username) != 0:
+        try:
+            server.login(username, passwd)
+        except Exception:
+            print('Either your username and/or password is incorrect, or you do not need to log in to your SMTP server to send messages.')
+            print('If a message is received, then no login is needed and you can leave username and password blank.')
     time.sleep(0.5)
-    server.sendmail('dmgalert@nist.gov', toaddress, msg.as_string())
+    server.sendmail(fromaddress, toaddress, msg.as_string())
     server.quit()
 
-#external to NIST network testing
-# def SendMessage(toaddress, message):                                            #method for sending messages
-#     server = smtplib.SMTP('smtp.gmail.com', 587)
-#     username = input('Login: ')
-#     passwd = input('Password: ')
-#     server.ehlo()                                                               #not needed for NIST
-#     server.starttls()                                                           #not supported by smtp.nist.gov, required for smtp.gmail.com
-#     server.login(username, passwd)                                              #not required by smtp.nist.gov, required for smtp.gmail.com
-#     server.sendmail('Test', toaddress, message)
-#     server.quit()
-
-#define sensor connection and reading functions
-def ConnectT3311():                                                             #Connect to instrument T3311 method, modbus RTU protocol
-    print('\n'+time.strftime("%Y-%m-%d %H:%M:%S")+' : Connecting to T3311...')
-    T3311_obj = minimalmodbus.Instrument(T3311port, 1)
-    time.sleep(5)
-    try:
-        T3311_obj.read_register(48,1)
-    except Exception:
-        pass
-    T3311_obj.serial.baudrate = 9600
-
-    return T3311_obj
-T3311_obj = ConnectT3311()                                                      #connect to instrument
-
-def T3311_errfix():
-    print('\n'+time.strftime("%Y-%m-%d %H:%M:%S")+' : Error reading from T3311, clearing buffer...')
-    T3311_obj.serial.baudrate = 19200
-    try:
-        T3311_obj.read_register(48,1)
-    except Exception:
-        pass
-    time.sleep(5)
-    T3311_obj.serial.baudrate = 9600
-    time.sleep(5)
-
-## Definitions for temperature and humidity measurement
-def ReadTemperature():                                                          #read T3311 address for temperature
-    temptemp = (T3311_obj.read_register(48, 1)-32)*5/9 + correction[0]          #read temperature, convert from deg. F to deg. C
-    return round(temptemp, 3)
-
-def ReadHumidity():                                                             #read T3311 address for humidity
-    temphumid = T3311_obj.read_register(49, 1) + correction[1]
-    return round(temphumid, 3)
+instr_obj = ConnectInstr()                                                      #connect to instrument
 
 #////////////////////////Variable Initialization\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ## Initialize variables and figure setup
@@ -205,7 +176,7 @@ humidity = []
 tf_alert_T = []
 tf_alert_RH = []
 plt.ion()                                                                       #activate interactive plotting
-fig = plt.figure(num=1, figsize=(4.2,2.2), dpi=dpi_set)                         #get matplotlib figure ID, set figure size
+fig = plt.figure(num=1, figsize=(figsize_x,figsize_y), dpi=dpi_set)             #get matplotlib figure ID, set figure size
 gs = gridspec.GridSpec(2,3)
 gs.update(hspace=0.05)
 ax1 = plt.subplot(gs[0,:])
@@ -221,13 +192,13 @@ labstatus_RH = 'normal'
 #check requires at least two values, second acquired in the loop
 #initial temperature
 try:
-    temptemp = ReadTemperature()                                                #read T3311 modbus address for temperature
+    temptemp = ReadTemperature()                                                #read instrument modbus address for temperature
 except Exception:                                                               #reestablish connection if failed
-    T3311_errfix()
+    Instr_errfix()
     try:
-        temptemp = ReadTemperature()                                            #read T3311 modbus address for temperature
+        temptemp = ReadTemperature()                                            #read instrumnet modbus address for temperature
     except Exception:
-        T3311_errfix()
+        Instr_errfix()
         try:
             temptemp = ReadTemperature()
         except Exception:
@@ -236,13 +207,13 @@ temperature.append(temptemp)
 
 #initial humidity
 try:
-    temphumid = ReadHumidity()                                                  #read T3311 modbus address for humidity
+    temphumid = ReadHumidity()                                                  #read instrument modbus address for humidity
 except Exception:                                                               #reestablish connection if failed
-    T3311_errfix()
+    Instr_errfix()
     try:
-        temphumid = ReadHumidity()                                              #read T3311 modbus address for humidity
+        temphumid = ReadHumidity()                                              #read instrument modbus address for humidity
     except Exception:
-        T3311_errfix()
+        Instr_errfix()
         try:
             temphumid = ReadHumidity()
         except Exception:
@@ -257,19 +228,16 @@ axestime = np.append(axestime, time.strftime("%H:%M"))
 ## Measure temperature and humidity for all eternity
 while True:
     ti = time.time()                                                            #begin/reset active timer---------------------------------------------------------------------------
-    # print('NIST Laboratory Environment Monitoring and Alert System (LEMAS), v1.06, October 2017')
-    # print('\n\nMichael Braine, August 2017\nCurator contact: michael.braine@nist.gov\n\nLogging began:'+starttime)
-
     #//////////////////////////Instrument Communications\\\\\\\\\\\\\\\\\\\\\\\\\\\\
     #read temperature
     try:
-        temptemp = ReadTemperature()                                            #read T3311 modbus address for temperature
+        temptemp = ReadTemperature()                                            #read instrument modbus address for temperature
     except Exception:                                                           #reestablish connection if failed
-        T3311_errfix()
+        Instr_errfix()
         try:
-            temptemp = ReadTemperature()                                        #read T3311 modbus address for temperature
+            temptemp = ReadTemperature()                                        #read instrument modbus address for temperature
         except Exception:
-            T3311_errfix()
+            Instr_errfix()
             try:
                 temptemp = ReadTemperature()
             except Exception:
@@ -279,13 +247,13 @@ while True:
     if abs(temptemp - temperature[-1]) > rereadT:
         time.sleep(10)
         try:
-            temptemp = ReadTemperature()                                        #read T3311 modbus address for temperature
+            temptemp = ReadTemperature()                                        #read instrument modbus address for temperature
         except Exception:
-            T3311_errfix()
+            Instr_errfix()
             try:
-                temptemp = ReadTemperature()                                    #read T3311 modbus address for temperature
+                temptemp = ReadTemperature()                                    #read instrument modbus address for temperature
             except Exception:
-                T3311_errfix()
+                Instr_errfix()
                 try:
                     temptemp = ReadTemperature()
                 except Exception:
@@ -294,13 +262,13 @@ while True:
 
     #read humidity
     try:
-        temphumid = ReadHumidity()                                              #read T3311 modbus address for humidity
+        temphumid = ReadHumidity()                                              #read instrument modbus address for humidity
     except Exception:                                                           #reestablish connection if failed
-        T3311_errfix()
+        Instr_errfix()
         try:
-            temphumid = ReadHumidity()                                          #read T3311 modbus address for humidity
+            temphumid = ReadHumidity()                                          #read instrument modbus address for humidity
         except Exception:
-            T3311_errfix()
+            Instr_errfix()
             try:
                 temphumid = ReadHumidity()
             except Exception:
@@ -310,13 +278,13 @@ while True:
     if abs(temphumid - humidity[-1]) > rereadRH:
         time.sleep(10)
         try:
-            temphumid = ReadHumidity()                                          #read T3311 modbus address for humidity
+            temphumid = ReadHumidity()                                          #read instrument modbus address for humidity
         except Exception:
-            T3311_errfix()
+            Instr_errfix()
             try:
-                temphumid = ReadHumidity()                                      #read T3311 modbus address for humidity
+                temphumid = ReadHumidity()                                      #read instrument modbus address for humidity
             except Exception:
-                T3311_errfix()
+                Instr_errfix()
                 try:
                     temphumid = ReadHumidity()
                 except Exception:
@@ -429,8 +397,4 @@ while True:
                 envfile.write(', ,HUMIDITY OUTAGE')
         envfile.write('\n')
         envfile.close()
-
-    tf = time.time()                                                            #stop timer---------------------------------------------------------------------------
-    if sleeptimer-(tf-ti) > 0:
-        time.sleep(sleeptimer-(tf-ti))                                          #sleep for sleeptimer less time taken for the above lines
 #end of while

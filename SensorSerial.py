@@ -1,3 +1,2 @@
-#///////////////Only change this between labs\\\\\\\\\\\\\\\\
-#serial number for the sensor coupled with this device
-sensorserial = '0'
+#Serial number for the sensor paired with the device <labID>. 
+sensorserial = ''
