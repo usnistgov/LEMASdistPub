@@ -28,11 +28,12 @@
 #
 #///////////////////////////////////////////////////////////////////////////////
 
-import smtplib, time, os, csv, datetime, copy, minimalmodbus
+import smtplib, time, os, csv, datetime, copy
 print('\n'+time.strftime("%Y-%m-%d %H:%M:%S")+' : Starting Laboratory Environment Monitoring and Alert System (LEMAS)')
 
-with open('/home/pi/LEMASdist/version', 'r') as fin:
-    print(fin.read()'\n\nQuietMode')
+install_location = os.path.dirname(os.path.realpath(__file__))
+with open(install_location+'/version', 'r') as fin:
+    print(fin.read()+'\n\nQuietMode')
 
 ## import python libraries
 from email.mime.text import MIMEText
@@ -42,8 +43,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
-program_directory = '/home/pi/LEMASdist'
-os.chdir(program_directory)
+os.chdir(install_location)
 
 #//////////////////////////Import various configurations\\\\\\\\\\\\\\\\\\\\\\\\
 from LabID import labID
@@ -66,9 +66,7 @@ from LabSettings import *
 #//////////////////////////Import instrument interface\\\\\\\\\\\\\\\\\\\\\\\\\\
 from InstrInterface import *
 
-os.chdir(program_directory+'/tmpimg')
-
-correction = copy.deepcopy(corrections[sensorserial])               #[temperature, humidity]
+correction = copy.deepcopy(corrections[sensorserial])                           #[temperature, humidity]
 TestmsgDate = datetime.datetime.strptime(TestmsgDate, "%B %d, %Y %H:%M:%S")
 
 #///////////////////////////Outage Parameter Setup\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
@@ -87,7 +85,6 @@ labcontacts = np.array([])
 for icontact in range(len(labusers)):
     labcontacts = np.append(labcontacts, allcontacts[labusers[icontact]])
 
-envdata_directory = '/home/pi/Desktop/EnvironmentData'                          #where data is stored in Linux file system, create if doesn't exist, doesn't really ever need changed
 TestmsgSent = False                                                             #initialize test message has not been sent
 ethoutage = False                                                               #initialize with internet outage status as false
 ethoutage_sent = False                                                          #initialize status of messages queued under internet outage as not sent
@@ -169,11 +166,11 @@ labstatus_RH = 'normal'
 #check requires at least two values, second acquired in the loop
 #initial temperature
 try:
-    temptemp = ReadTemperature(instr_obj)                                                #read instrument modbus address for temperature
+    temptemp = ReadTemperature(instr_obj)                                       #read instrument modbus address for temperature
 except Exception:                                                               #reestablish connection if failed
     instr_obj = Instr_errfix(instr_obj)
     try:
-        temptemp = ReadTemperature(instr_obj)                                            #read instrumnet modbus address for temperature
+        temptemp = ReadTemperature(instr_obj)                                   #read instrumnet modbus address for temperature
     except Exception:
         instr_obj = Instr_errfix(instr_obj)
         try:
@@ -184,11 +181,11 @@ temperature.append(temptemp + correction[0])
 
 #initial humidity
 try:
-    temphumid = ReadHumidity(instr_obj)                                                  #read instrument modbus address for humidity
+    temphumid = ReadHumidity(instr_obj)                                         #read instrument modbus address for humidity
 except Exception:                                                               #reestablish connection if failed
     instr_obj = Instr_errfix(instr_obj)
     try:
-        temphumid = ReadHumidity(instr_obj)                                              #read instrument modbus address for humidity
+        temphumid = ReadHumidity(instr_obj)                                     #read instrument modbus address for humidity
     except Exception:
         instr_obj = Instr_errfix(instr_obj)
         try:
@@ -208,11 +205,11 @@ while True:
     #//////////////////////////Instrument Communications\\\\\\\\\\\\\\\\\\\\\\\\\\\\
     #read temperature
     try:
-        temptemp = ReadTemperature(instr_obj)                                            #read instrument modbus address for temperature
+        temptemp = ReadTemperature(instr_obj)                                   #read instrument modbus address for temperature
     except Exception:                                                           #reestablish connection if failed
         instr_obj = Instr_errfix(instr_obj)
         try:
-            temptemp = ReadTemperature(instr_obj)                                        #read instrument modbus address for temperature
+            temptemp = ReadTemperature(instr_obj)                               #read instrument modbus address for temperature
         except Exception:
             instr_obj = Instr_errfix(instr_obj)
             try:
@@ -224,11 +221,11 @@ while True:
     if abs(temptemp - temperature[-1]) > rereadT:
         time.sleep(10)
         try:
-            temptemp = ReadTemperature(instr_obj)                                        #read instrument modbus address for temperature
+            temptemp = ReadTemperature(instr_obj)                               #read instrument modbus address for temperature
         except Exception:
             instr_obj = Instr_errfix(instr_obj)
             try:
-                temptemp = ReadTemperature(instr_obj)                                    #read instrument modbus address for temperature
+                temptemp = ReadTemperature(instr_obj)                           #read instrument modbus address for temperature
             except Exception:
                 instr_obj = Instr_errfix(instr_obj)
                 try:
@@ -239,11 +236,11 @@ while True:
 
     #read humidity
     try:
-        temphumid = ReadHumidity(instr_obj)                                              #read instrument modbus address for humidity
+        temphumid = ReadHumidity(instr_obj)                                     #read instrument modbus address for humidity
     except Exception:                                                           #reestablish connection if failed
         instr_obj = Instr_errfix(instr_obj)
         try:
-            temphumid = ReadHumidity(instr_obj)                                          #read instrument modbus address for humidity
+            temphumid = ReadHumidity(instr_obj)                                 #read instrument modbus address for humidity
         except Exception:
             instr_obj = Instr_errfix(instr_obj)
             try:
@@ -255,11 +252,11 @@ while True:
     if abs(temphumid - humidity[-1]) > rereadRH:
         time.sleep(10)
         try:
-            temphumid = ReadHumidity(instr_obj)                                          #read instrument modbus address for humidity
+            temphumid = ReadHumidity(instr_obj)                                 #read instrument modbus address for humidity
         except Exception:
             instr_obj = Instr_errfix(instr_obj)
             try:
-                temphumid = ReadHumidity(instr_obj)                                      #read instrument modbus address for humidity
+                temphumid = ReadHumidity(instr_obj)                             #read instrument modbus address for humidity
             except Exception:
                 instr_obj = Instr_errfix(instr_obj)
                 try:

@@ -1,4 +1,4 @@
-import time
+import time 																	#for getting the current system time within the return strings
 
 #////////////////////////////////Test message\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 def testmsg(labID, temperature, humidity):
@@ -33,7 +33,7 @@ def RHinternetOUTmsg(labID, RHmin, RHmax, temperature, humidity):				#initial hu
 def RHRETURNmsg(labID, RHmin, RHmax, temperature, humidity):					#message when humidity returns to normal
 	return 'Resolved: the humidity for '+labID+' returned to its normal range [%.2f' % RHmin+', %.2f' % RHmax+'] at '+time.strftime('%a %b %d, %Y, %I.%M %p')+' EST.'
 
-def RHinternetRETURNmsg(labID, RHmin, RHmax, temperature, humidity):					#message when humidity returns to normal
+def RHinternetRETURNmsg(labID, RHmin, RHmax, temperature, humidity):			#message when humidity returns to normal
 	return 'Resolved: the humidity for '+labID+' returned to its normal range [%.2f' % RHmin+', %.2f' % RHmax+'] at '+time.strftime('%a %b %d, %Y, %I.%M %p')+' EST.'
 
 def RHincmsg(labID, RHmin, RHmax, temperature, humidity):						#message when humidity increases

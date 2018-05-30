@@ -1,8 +1,7 @@
-import time, minimalmodbus
-#from LabSettings import instrport
+import time, minimalmodbus                                                      #for modbus RTU protocols
 #defines sensor functions. Current interfaces use modbus protocols
 #set up interface
-def ConnectInstr(instrport):                                                             #Connect to instrument with modbus RTU protocol
+def ConnectInstr(instrport):                                                    #Connect to instrument with modbus RTU protocol
     print('\n'+time.strftime("%Y-%m-%d %H:%M:%S")+' : Connecting to instrument...')
     instr_obj = minimalmodbus.Instrument(instrport, 1)                          #modbus protocols
     time.sleep(5)

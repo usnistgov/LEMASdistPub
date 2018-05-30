@@ -1,0 +1,124 @@
+#!/bin/bash
+echo ' '
+echo 'The purpose of this script is to set up environment controls, contacts and contact information for ALL devices. To install LEMAS to a Linux system, use install-LEMAS instead.'
+echo "To exit the script at any time, press ctrl+c when the terminal window is active. The only changes this script makes is the creation of Tcontrols.py, RHcontrols.py and Contacts.py on the desktop (/home/$USER/Desktop/)."
+echo ' '
+echo "When the script is complete, Tcontrols.py, RHcontrols.py and Contacts.py will be created on the desktop (/home/$USER/Desktop). Simply copy the three files onto a flash drive and distribute to the LEMAS install location on each device. On Raspbian, this is /home/pi/LEMASdist. Overwrite the existing Tcontrols, RHcontrols and Contacts.py."
+echo ' '
+echo 'Lets get on with it. We will start by adding laboratory IDs and the environment controls associated with these labIDs.'
+echo 'The labIDs entered here MUST match the labIDs entered on individual systems; otherwise, the system will not be able to look up the associated controls and contacts.'
+echo 'Leave an entry blank to finish entering labIDs and environment controls, and move on to contacts and contact information.'
+
+touch /home/$USER/Desktop/Tcontrols.py                                          #create *controls.py file on desktop
+touch /home/$USER/Desktop/RHcontrols.py
+touch /home/$USER/Desktop/labIDs
+
+#headers for *controls.py files
+echo "# Lab temperature controls
+#If these ever need changed, the format is: Tcontrols['<labID>'] = [<minimum temperature>, <maximum temperature>]
+#Add new temperature controls below the last line
+#Units are degrees Celsius
+Tcontrols = {}                                                                  #initialize empty dictionary" >> /home/$USER/Desktop/Tcontrols.py
+
+echo "# Lab humidity controls
+#If these ever need changed, the format is: RHcontrols['<labID>'] = [<minimum humidity>, <maximum humidity>]
+#Add new humidity controls below the last line
+#Units are percent relative humidity (0 - 100)
+RHcontrols = {}                                                                 #initialize empty dictionary" >> /home/$USER/Desktop/RHcontrols.py
+
+#add labID
+labIDsetup='a'
+while [[ $labIDsetup != '' ]]; do
+  echo ' '
+  echo "Leave the 'LabID' entry empty and press enter to finish entering controls."
+  echo -n 'LabID: '
+  read labIDsetup
+  echo -n "Minimum temperature for $labID: "
+  read Tmin
+  echo -n "Maximum temperature for $labID: "
+  read Tmax
+  echo -n "Minimum humidity for $labID: "
+  read RHmin
+  echo -n "Maximum humidity for $labID: "
+  read RHmax
+  echo "Tcontrols['$labIDsetup'] = [$Tmin, $Tmax]" >> /home/$USER/Desktop/Tcontrols.py
+  echo "RHcontrols['$labIDsetup'] = [$RHmin, $RHmax]" >> /home/$USER/Desktop/RHcontrols.py
+  echo $labIDsetup >> /home/$USER/Desktop/labIDs
+done
+echo "#Tcontrols['<labID>'] = [<minimum temperature>, <maximum temperature>]" >> /home/$USER/Desktop/Tcontrols.py
+echo "#RHcontrols['<labID>'] = [<minimum humidity>, <maximum humidity>]" >> /home/$USER/Desktop/RHcontrols.py
+
+contact='a'
+
+echo ' '
+echo 'Now, for contact and contact information. Afterward, we will assign the labs these contacts for alerts. Search the internet for a list of MMS/SMS gateways for cell carriers if entering cellphone contacts.'
+echo 'To send a text to a cellphone number, you must create an e-mail address using the cellphone number and MMS/SMS carrier gateway.'
+echo 'The difference between MMS and SMS: MMS can receive text with an image attached, similar to e-mail, while SMS can only receive text.'
+echo 'For example, Verizon Wireless MMS gateway is vzwpix.com. To send a MMS to a number, say 123-456-7890, using Verizon Wireless, we construct the e-mail address as follows: 1234567890@vzwpix.com'
+
+touch /home/$USER/Desktop/Contacts.py
+touch /home/$USER/Desktop/cinfo
+
+echo "
+allcontacts = {}                                                                #initialize empty dictionary" >> /home/$USER/Desktop/Contacts.py
+
+while [[ $contact != '' ]]; do
+  echo ' '
+  echo "Leave the 'Name of contact' entry empty and press enter to finish entering contacts."
+  echo -n 'Name of contact: '
+  read contact
+  if [[ $contact != '' ]]; then
+    echo $contect >> /home/$USER/Desktop/cinfo
+    string="allcontacts['$contact'] = ['"
+    echo 'Enter one cell number+gateway or e-mail at a time.'
+    echo -n "Contact information for $contact: "
+    read cinfo
+    string=$string$cinfo"'"
+    while [[ $cinfo != '' ]]; do
+      echo "Leave the 'Contact information' entry empty and press enter to finish entering contact information."
+      echo -n "Contact information for $contact: "
+      read cinfo
+      if [[ $cinfo != '' ]]; then
+        string=$string", '$cinfo'"
+      else
+        string=$string"]"
+        echo $string >> /home/$USER/Desktop/Contacts.py
+      fi
+    done
+  fi
+done
+
+echo 'Finally, on to assigning labs their lab users. Enter one contact at a time. The name of the contact MUST EXACTLY match the name as previously entered, including capital letters! Caution: trying to copy-paste WILL result in the script exiting.'
+
+echo "
+labusers = {}                                                                   #initialize empty dictionary" >> /home/$USER/Desktop/Contacts.py
+
+while read line; do
+  echo 'Available contacts'
+  echo ' '
+  while read line; do
+    echo $line
+  done </home/$USER/Desktop/cinfo
+
+  string="labusers['$line'] = ['"
+  echo -n "Contact for $line: "
+  read contact
+  string=$string$contact"'"
+  while [[ $contact != '' ]]; do
+    echo "Leave the 'Contact for...' entry empty and press enter to finish assigning contacts to the current lab."
+    echo -n "Contact for $line: "
+    read contact
+    if [[ $contact != '' ]]; then
+      string=$string", '$contact'"
+    else
+      string=$string"]"
+      echo $string >> /home/$USER/Desktop/Contacts.py
+    fi
+  done
+done </home/$USER/Desktop/labIDs
+echo "#labusers['<labID>'] = ['user1', 'user2']" >> /home/$USER/Desktop/Contacts.py
+
+rm /home/$USER/Desktop/labIDs
+rm /home/$USER/Desktop/cinfo
+
+echo "RHcontrols.py, Tcontrols.py and Contacts.py have been set up and are available in /home/$USER/Desktop/. Copy these to a flash drive and distribute to your LEMAS devices. On Raspbian, this is /home/pi/LEMASdist. Overwrite the existing Tcontrols, RHcontrols and Contacts.py."

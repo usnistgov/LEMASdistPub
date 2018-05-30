@@ -1,0 +1,87 @@
+#!/bin/bash
+echo ' '
+echo 'The purpose of this script is to install the necessary files for LEMAS to operate on a Linux system. To set up environment controls, contacts and contact information for ALL devices, use setup-LEMAS instead.'
+echo '!!!Run setup-LEMAS first, once, for distributing the same controls and contacts to all devices!!!'
+echo 'To exit the script at any time, press ctrl+c when the terminal window is active.'
+echo ' '
+understand='no'
+while [[ $understand = 'no' ]]; do
+  echo -n 'Is this setup using an Adafuit 5" display? [y/<n>]: '
+  read ispi
+  if [[ $ispi = 'y' ]] || [[ $ispi = 'Y' ]]; then
+    echo 'A config will be installed to /boot/ to allow the display to be used.'
+    understand='yes'
+  elif [[ $ispi = 'n' ]] || [[ $ispi = 'N' ]] || [[ $ispi = '' ]]; then
+    echo 'No configs should be needed for the display...double check the display supplier if there is no output or output is malfunctioning.'
+  else
+    echo 'Response not understood. y or n only.'
+  fi
+done
+echo ' '
+echo "The install path of LEMAS will be /home/$USER/LEMASdist"
+echo ' '
+understand='no'
+echo 'The hostname for this system must be unique in order to identify itself on the network. Reusing a hostname may make remotely connecting to the system difficult. Use only alphanumeric characters.'
+while [[ $understand = 'no' ]]; do
+  echo -n "Current hostname is $HOSTNAME. Set a new hostname? [y/<n>]: "
+  read newhost
+  if [[ $newhost = 'y' ]] || [[ $newhost = 'Y' ]]; then
+    echo -n 'New hostname: '
+    read hostname
+    understand='yes'
+  elif [[ $newhost = 'n' ]] || [[ $newhost = 'N' ]] || [[ $newhost = '' ]]; then
+    echo "OK, using $HOSTNAME as the hostname. Be sure it is unique on the network."
+  else
+    echo 'Response not understood. y or n only.'
+  fi
+done
+
+echo ' '
+echo 'The laboratory ID (labID) is a unique identifier that distinguishes this system from others when messages are sent. Tips: Use an ID that represents the activities in the assigned lab, or even room number.'
+echo -n 'Laboratory ID: '
+read labID
+
+echo "Corrections can be made on the sensor. To make no corrections, leave the following prompt empty and press enter. Otherwise, enter the sensor serial number."
+echo -n 'Sensor serial number: '
+read serial
+
+#//////////////////////////////////INSTALL\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+echo ' '
+echo 'Now installing...this will be quick.'
+CWD=$(pwd)
+
+if [[ $newhost = 'y' ]] || [[ $newhost = 'Y' ]]; then
+  echo 'setting hostname'
+  #etc
+  #the other place
+fi
+
+echo "making LEMAS directories in /home/$USER/"
+mkdir /home/$USER/LEMASdist
+mkdir /home/$USER/LEMASdist/tmpimg
+
+if [[ $ispi = 'y' ]] || [[ $ispi = 'Y']]; then
+  echo "installing config for Adafruit display, /boot/config.txt"
+  sudo cp $CWD/LEMASpi/config.txt /boot/config.txt
+  echo "disabling screensaver for Adafruit display, /etc/lightdm/lightdm.conf"
+  sudo cp $CWD/LEMASpi/lightdm.conf /etc/lightdm/lightdm.conf
+fi
+
+echo "installing LEMAS files, /home/$USER/LEMASdist/*"
+cp $CWD/Contacts.py $CWD/corrections.py $CWD/InstrInterface.py $CWD/LabSettings $CWD/LEMAS* $CWD/messages.py $CWD/NoContact.list $CWD/RHcontrols.py $CWD/ServerInfo.py $CWD/Tcontrols.py $CWD/testmsgdate.py $CWD/version /home/$USER/LEMASdist/
+
+echo "setting labID as $labID, /home/$USER/LEMASdist/LabID.py"
+touch /home/$USER/LEMASdist/LabID.py
+echo "#assigned lab identification for this device. format at NIST is <building number>/<lab number>. set as a string" >> /home/$USER/LEMASdist/LabID.py
+echo "labID = '$labID'" >> /home/$USER/LEMASdist/LabID.py
+
+echo "setting sensor serial number, /home/$USER/LEMASdist/SensorSerial.py"
+touch /home/$USER/LEMASdist/SensorSerial.py
+echo "sensorserial = '$serial'" >> /home/$USER/LEMASdist/SensorSerial.py
+
+echo "enabling LEMAS to run upon login to $USER with LXTerminal"
+echo "this will fail if not using a Raspberry Pi 3, in which case, you must find a solution to auto-launch a script. ChronTab does this."
+echo "@lxterminal -e /usr/bin/python3 /home/$USER/LEMASdist/LEMASRun.py" >> /home/$USER/.config/lxsession/LXDE-pi/autostart
+
+echo " "
+echo "Install complete."
