@@ -1,0 +1,65 @@
+#!/bin/bash
+#LEMAS
+#   Tested on Ubuntu 14.04
+#
+#///////////////////////////////////////////////////////////////////////////////
+## Notes
+#   May, 2018
+#   Authored by: Michael Braine, Physical Science Technician, NIST, Gaithersburg, MD
+#       PHONE: 301 975 8746
+#       EMAIL: michael.braine@nist.gov (use this instead of phone)
+#
+#   Purpose
+#       command line tool for modifying LEMAS
+#
+#///////////////////////////////////////////////////////////////////////////////
+## References
+#
+##//////////////////////////////////////////////////////////////////////////////
+## Change log from v1.00 to v1.00
+#   May 30, 2018
+#
+#   ver 1.00 - initial version
+#
+#///////////////////////////////////////////////////////////////////////////////
+## Inputs
+#       $1 - 1st input is tool selection. Tools are:
+#            start   ---- start environment monitoring
+#            stop    ---- stop environment monitoring
+#            quiet   ---- enable QuietMode, system is not allowed to send text messages and emails
+#            loud    ---- enable LoudMode, systme is allowed to send text messages and emails
+#            set     ---- set variable to value defined by the following input
+#            adduser ---- add a user, followed with the labID to add a user to and the name of the user
+#            addcontact - add a contact for a user, followed with the name of the user and the contact information. one contact point at a time only
+#       $2 - 2nd input is variable to edit
+#       $3 - 3rd input is new value to assign to variable
+#
+#///////////////////////////////////////////////////////////////////////////////
+
+if [[ $1 = 'start' ]]; then
+  if [[ $DISPLAY = '' ]]; then
+    echo -n 'LEMAS requires a display for matplotlib and must be start locally or reboot remotely. Reboot now? [y/<N>]: '
+    read answer
+    if [[ $answer = 'y']]; then
+      sudo reboot 0
+    fi
+  else python3 /home/pi/LEMASdist/LEMASRun.py
+  fi
+elif [[ $2 = 'stop' ]]; then kill -9 $(pgrep -fn LEMASRun.py | awk 'NR==1{print $1}')
+elif [[ $1 = 'quiet' ]]; then
+  cp /home/pi/LEMASdist/LEMASRunQuiet.py /home/pi/LEMASdist/LEMASRun.py
+  echo -n 'System will be set into QuietMode upon reboot. Reboot now? [y/<N>]: '
+  read answer
+  if [[ $answer = 'y' ]]; then sudo reboot 0
+  elif [[ $answer = '' ]]; then sudo reboot 0
+elif [[ $1 = 'loud' ]]; then
+  cp /home/pi/LEMASdist/LEMASRunLoud.py /home/pi/LEMASdist/LEMASRun.py
+  echo -n 'System will be set into LoudMode upon reboot. Reboot now? [y/<N>]: '
+  read answer
+  if [[ $answer = 'y' ]]; then
+    sudo reboot 0
+  elif [[ $answer = '' ]]; then
+    sudo reboot 0
+elif [[ $1 = 'set' ]]; then
+
+fi

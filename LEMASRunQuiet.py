@@ -1,15 +1,15 @@
-#LEMASRunQuiet.py
+#LEMASRun.py
 #   Tested with Python 3.6.1 (Anaconda 4.4.0 stack) on Linux Mint 18.2 Sonya Cinnamon, Python 3.4.2, on Raspbian Linux
 #
 #///////////////////////////////////////////////////////////////////////////////
-## LEMASRunQuiet.py Notes
+## LEMASRun.py Notes
 #   August, 2017
 #   Authored by: Michael Braine, Physical Science Technician, NIST, Gaithersburg, MD
 #       PHONE: 301 975 8746
 #       EMAIL: michael.braine@nist.gov (use this instead of phone)
 #
 #   Purpose
-#       continuously read temperature and humidity from instrument
+#       continuously read temperature and humidity from instrument, send notification via text/email with graph attached to lab users if temperature or humidity is outside of specified limits
 #       log temperature and humidity to <month><YYYY>-all.env.csv
 #       log temperature and humidity outages to <month><YYYY>-outage.env.csv
 #
@@ -19,23 +19,25 @@
 #
 ##///////////////////////////////////////////////////////////////////////////////
 ## Change log from v1.11 to v1.12
-#   May 10, 2018
+#   May 30, 2018
 #
 #   ver 1.12    - moved server information into .py file to easily edit in the public distribution
 #               - moved instrument interface into .py file to  easily edit in the public distribution
+#               - moved messages into .py file to easily edit in the public distribution
+#               - added variable for number of tickmarks on y-axis
 #
 #///////////////////////////////////////////////////////////////////////////////
 
-print('\n'+time.strftime("%Y-%m-%d %H:%M:%S")+' : Starting Laboratory Environment Monitoring and Alert System (LEMAS), v1.12, May 2018')
-print('\n\nMichael Braine, August 2017\nmichael.braine@nist.gov')
-print('\n\nQuiet Mode')
+import smtplib, time, os, csv, datetime, copy, minimalmodbus
+print('\n'+time.strftime("%Y-%m-%d %H:%M:%S")+' : Starting Laboratory Environment Monitoring and Alert System (LEMAS)')
+
+with open('/home/pi/LEMASdist/version', 'r') as fin:
+    print(fin.read()'\n\nQuietMode')
 
 ## import python libraries
-import smtplib, time, os, csv, datetime, copy
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
-import minimalmodbus
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -51,48 +53,22 @@ from RHcontrols import RHcontrols
 from corrections import corrections
 
 from Contacts import allcontacts
-from Contacts import labusers
+from Contacts import labusers as labusers_dict
 
 from testmsgdate import TestmsgDate
-from testmsgdate import Testmsg
 
-from ServerInfo import SMTPaddress
-from ServerInfo import SMTPport
-from ServerInfo import logaddress
-from ServerInfo import fromaddress
-from ServerInfo import username
-from ServerInfo import passwd
+from ServerInfo import *
 
-from LabSettings import instrport
-from LabSettings import pts_hr
-from LabSettings import graphtime
-from LabSettings import tickspacing
-from LabSettings import dpi_set
-from LabSettings import normalstatus_wait
-from LabSettings import TincSet
-from LabSettings import RHincSet
-from LabSettings import graphTmax
-from LabSettings import graphTmin
-from LabSettings import graphRHmax
-from LabSettings import graphRHmin
-from LabSettings import FontsizeLabel
-from LabSettings import FontsizeYticks
-from LabSettings import FontsizeXticks
-from LabSettings import GraphLinewidth
-from LabSettings import rereadT
-from LabSettings import rereadRH
-from LabSettings import figsize_x
-from LabSettings import figsize_y
+from messages import *
+
+from LabSettings import *
 
 #//////////////////////////Import instrument interface\\\\\\\\\\\\\\\\\\\\\\\\\\
-from InstrInterface import ConnectInstr
-from InstrInterface import Instr_errfix
-from InstrInterface import ReadTemperature
-from InstrInterface import ReadHumidity
+from InstrInterface import *
 
 os.chdir(program_directory+'/tmpimg')
 
-correction = copy.deepcopy(corrections.corrections[sensorserial])               #[temperature, humidity]
+correction = copy.deepcopy(corrections[sensorserial])               #[temperature, humidity]
 TestmsgDate = datetime.datetime.strptime(TestmsgDate, "%B %d, %Y %H:%M:%S")
 
 #///////////////////////////Outage Parameter Setup\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
@@ -106,6 +82,7 @@ RHmax = RHcontrols[labID][1]                                                    
 TincAlert = [Tmin - TincSet, Tmax + TincSet]
 RHincAlert = [RHmin - RHincSet, RHmax + RHincSet]
 
+labusers = copy.deepcopy(labusers_dict[labID])
 labcontacts = np.array([])
 for icontact in range(len(labusers)):
     labcontacts = np.append(labcontacts, allcontacts[labusers[icontact]])
@@ -165,7 +142,7 @@ def SendMessageMMS(toaddress, message, img_path):                               
     server.sendmail(fromaddress, toaddress, msg.as_string())
     server.quit()
 
-instr_obj = ConnectInstr()                                                      #connect to instrument
+instr_obj = ConnectInstr(instrport)                                             #connect to instrument
 
 #////////////////////////Variable Initialization\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ## Initialize variables and figure setup
@@ -177,8 +154,8 @@ tf_alert_T = []
 tf_alert_RH = []
 plt.ion()                                                                       #activate interactive plotting
 fig = plt.figure(num=1, figsize=(figsize_x,figsize_y), dpi=dpi_set)             #get matplotlib figure ID, set figure size
-gs = gridspec.GridSpec(2,3)
-gs.update(hspace=0.05)
+gs = gridspec.GridSpec(r_plot, c_plot)
+gs.update(hspace=hspace_set)
 ax1 = plt.subplot(gs[0,:])
 ax2 = plt.subplot(gs[1,:])
 fig.subplots_adjust(left=0.06, right=1, top=0.98, bottom=0.14)
@@ -192,33 +169,33 @@ labstatus_RH = 'normal'
 #check requires at least two values, second acquired in the loop
 #initial temperature
 try:
-    temptemp = ReadTemperature()                                                #read instrument modbus address for temperature
+    temptemp = ReadTemperature(instr_obj)                                                #read instrument modbus address for temperature
 except Exception:                                                               #reestablish connection if failed
-    Instr_errfix()
+    instr_obj = Instr_errfix(instr_obj)
     try:
-        temptemp = ReadTemperature()                                            #read instrumnet modbus address for temperature
+        temptemp = ReadTemperature(instr_obj)                                            #read instrumnet modbus address for temperature
     except Exception:
-        Instr_errfix()
+        instr_obj = Instr_errfix(instr_obj)
         try:
-            temptemp = ReadTemperature()
+            temptemp = ReadTemperature(instr_obj)
         except Exception:
             print('\n'+time.strftime("%Y-%m-%d %H:%M:%S")+' : Communications with instrument failed')
-temperature.append(temptemp)
+temperature.append(temptemp + correction[0])
 
 #initial humidity
 try:
-    temphumid = ReadHumidity()                                                  #read instrument modbus address for humidity
+    temphumid = ReadHumidity(instr_obj)                                                  #read instrument modbus address for humidity
 except Exception:                                                               #reestablish connection if failed
-    Instr_errfix()
+    instr_obj = Instr_errfix(instr_obj)
     try:
-        temphumid = ReadHumidity()                                              #read instrument modbus address for humidity
+        temphumid = ReadHumidity(instr_obj)                                              #read instrument modbus address for humidity
     except Exception:
-        Instr_errfix()
+        instr_obj = Instr_errfix(instr_obj)
         try:
-            temphumid = ReadHumidity()
+            temphumid = ReadHumidity(instr_obj)
         except Exception:
             print('\n'+time.strftime("%Y-%m-%d %H:%M:%S")+' : Communications with instrument failed')
-humidity.append(temphumid)
+humidity.append(temphumid + correction[1])
 
 #initial time data
 currenttime = np.append(currenttime, time.strftime("%Y-%m-%d %H:%M:%S"))        #get current system time (yyyy mm dd hh mm ss)
@@ -231,15 +208,15 @@ while True:
     #//////////////////////////Instrument Communications\\\\\\\\\\\\\\\\\\\\\\\\\\\\
     #read temperature
     try:
-        temptemp = ReadTemperature()                                            #read instrument modbus address for temperature
+        temptemp = ReadTemperature(instr_obj)                                            #read instrument modbus address for temperature
     except Exception:                                                           #reestablish connection if failed
-        Instr_errfix()
+        instr_obj = Instr_errfix(instr_obj)
         try:
-            temptemp = ReadTemperature()                                        #read instrument modbus address for temperature
+            temptemp = ReadTemperature(instr_obj)                                        #read instrument modbus address for temperature
         except Exception:
-            Instr_errfix()
+            instr_obj = Instr_errfix(instr_obj)
             try:
-                temptemp = ReadTemperature()
+                temptemp = ReadTemperature(instr_obj)
             except Exception:
                 print('\n'+time.strftime("%Y-%m-%d %H:%M:%S")+' : Communications with instrument failed')
 
@@ -247,30 +224,30 @@ while True:
     if abs(temptemp - temperature[-1]) > rereadT:
         time.sleep(10)
         try:
-            temptemp = ReadTemperature()                                        #read instrument modbus address for temperature
+            temptemp = ReadTemperature(instr_obj)                                        #read instrument modbus address for temperature
         except Exception:
-            Instr_errfix()
+            instr_obj = Instr_errfix(instr_obj)
             try:
-                temptemp = ReadTemperature()                                    #read instrument modbus address for temperature
+                temptemp = ReadTemperature(instr_obj)                                    #read instrument modbus address for temperature
             except Exception:
-                Instr_errfix()
+                instr_obj = Instr_errfix(instr_obj)
                 try:
-                    temptemp = ReadTemperature()
+                    temptemp = ReadTemperature(instr_obj)
                 except Exception:
                     print('\n'+time.strftime("%Y-%m-%d %H:%M:%S")+' : Communications with instrument failed')
-    temperature.append(temptemp)
+    temperature.append(temptemp + correction[0])
 
     #read humidity
     try:
-        temphumid = ReadHumidity()                                              #read instrument modbus address for humidity
+        temphumid = ReadHumidity(instr_obj)                                              #read instrument modbus address for humidity
     except Exception:                                                           #reestablish connection if failed
-        Instr_errfix()
+        instr_obj = Instr_errfix(instr_obj)
         try:
-            temphumid = ReadHumidity()                                          #read instrument modbus address for humidity
+            temphumid = ReadHumidity(instr_obj)                                          #read instrument modbus address for humidity
         except Exception:
-            Instr_errfix()
+            instr_obj = Instr_errfix(instr_obj)
             try:
-                temphumid = ReadHumidity()
+                temphumid = ReadHumidity(instr_obj)
             except Exception:
                 print('\n'+time.strftime("%Y-%m-%d %H:%M:%S")+' : Communications with instrument failed')
 
@@ -278,18 +255,18 @@ while True:
     if abs(temphumid - humidity[-1]) > rereadRH:
         time.sleep(10)
         try:
-            temphumid = ReadHumidity()                                          #read instrument modbus address for humidity
+            temphumid = ReadHumidity(instr_obj)                                          #read instrument modbus address for humidity
         except Exception:
-            Instr_errfix()
+            instr_obj = Instr_errfix(instr_obj)
             try:
-                temphumid = ReadHumidity()                                      #read instrument modbus address for humidity
+                temphumid = ReadHumidity(instr_obj)                                      #read instrument modbus address for humidity
             except Exception:
-                Instr_errfix()
+                instr_obj = Instr_errfix(instr_obj)
                 try:
-                    temphumid = ReadHumidity()
+                    temphumid = ReadHumidity(instr_obj)
                 except Exception:
                     print('\n'+time.strftime("%Y-%m-%d %H:%M:%S")+' : Communications with instrument failed')
-    humidity.append(temphumid)
+    humidity.append(temphumid + correction[1])
 
     #get and format time
     currenttime = np.append(currenttime, time.strftime("%Y-%m-%d %H:%M:%S"))    #get current system time (yyyy mm dd hh mm ss)
@@ -315,12 +292,11 @@ while True:
     plt.fill_between(np.array(time_vec), np.zeros([len(time_vec),])+Tmax, np.zeros([len(time_vec),])+1000, alpha=0.2, color='lightblue')
     ax1.set_ylim([min(temperature)-graphTmin, max(temperature)+graphTmax])      #y-axis limits
     ax1.ticklabel_format(style='plain')                                         #disable scientific notation on y-axis
-    #plt.ylabel('Temperature (deg. C)', fontsize=4)
     plt.setp(ax1.get_xticklabels(), visible=False)                              #hide tickmarks, will use shared axis
     plt.grid(color='gray', alpha=0.3)
     plt.text(0.05, 0.1, 'Temperature (deg. C)', transform=ax1.transAxes, alpha=0.5, fontsize=FontsizeLabel, color='gray') #add transparent text to bottom left of first axes
     ax1.patch.set_facecolor('black')
-    plt.yticks(fontsize=FontsizeYticks)
+    plt.yticks(np.round(np.linspace(min(temperature)-graphTmin, max(temperature)+graphTmax, nticks_y), 1), fontsize=FontsizeYticks)
     plt.ticklabel_format(useOffset=False)
 
     #plot humidity with temperature's x-axis
@@ -333,17 +309,14 @@ while True:
     plt.fill_between(np.array(time_vec), np.zeros([len(time_vec),])+RHmax, np.zeros([len(time_vec),])+1000, alpha=0.2, color='lightblue')
     ax2.set_ylim([min(humidity)-graphRHmin, max(humidity)+graphRHmax])
     ax2.ticklabel_format(style='plain')
-    #plt.ylabel('Humidity (%RH)', fontsize=4)
     plt.grid(color='gray', alpha=0.3)
     plt.text(0.05, 0.1, 'Humidity (%RH) ', transform=ax2.transAxes, alpha=0.5, fontsize=FontsizeLabel, color='gray')
     ax2.patch.set_facecolor('black')
-    plt.yticks(fontsize=FontsizeYticks)
+    plt.yticks(np.round(np.linspace(min(humidity)-graphRHmin, max(humidity)+graphRHmax, nticks_y), 1), fontsize=FontsizeYticks)
     plt.ticklabel_format(useOffset=False)
 
     #setup xticks
-    plt.xticks(np.arange(min(time_vec), max(time_vec), tick_spacing), axestime[np.arange(min(time_vec), max(time_vec), tick_spacing)], rotation='vertical', fontsize=FontsizeXticks)
-    #plt.xlabel('Time (YYYY-mm-dd hh:mm:ss)')
-    #plt.tight_layout()
+    plt.xticks(np.arange(min(time_vec), max(time_vec), tickspacing_x), axestime[np.arange(min(time_vec), max(time_vec), tickspacing_x)], rotation='vertical', fontsize=FontsizeXticks)
     plt.pause(0.001)
 
     #///////////////////////////////Environment Logs\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
@@ -397,4 +370,7 @@ while True:
                 envfile.write(', ,HUMIDITY OUTAGE')
         envfile.write('\n')
         envfile.close()
+    tf = time.time()                                                            #stop timer---------------------------------------------------------------------------
+    if sleeptimer-(tf-ti) > 0:
+        time.sleep(sleeptimer-(tf-ti))                                          #sleep for sleeptimer less time taken for the above lines
 #end of while

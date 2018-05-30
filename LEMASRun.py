@@ -23,19 +23,21 @@
 #
 #   ver 1.12    - moved server information into .py file to easily edit in the public distribution
 #               - moved instrument interface into .py file to  easily edit in the public distribution
+#               - moved messages into .py file to easily edit in the public distribution
+#               - added variable for number of tickmarks on y-axis
 #
 #///////////////////////////////////////////////////////////////////////////////
 
-print('\n'+time.strftime("%Y-%m-%d %H:%M:%S")+' : Starting Laboratory Environment Monitoring and Alert System (LEMAS), v1.12, May 2018')
-print('\n\nMichael Braine, August 2017\nmichael.braine@nist.gov')
-print('\n\nLoud Mode')
+import smtplib, time, os, csv, datetime, copy, minimalmodbus
+print('\n'+time.strftime("%Y-%m-%d %H:%M:%S")+' : Starting Laboratory Environment Monitoring and Alert System (LEMAS)')
+
+with open('/home/pi/LEMASdist/version', 'r') as fin:
+    print(fin.read()'\n\nLoudMode')
 
 ## import python libraries
-import smtplib, time, os, csv, datetime, copy
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
-import minimalmodbus
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -51,48 +53,22 @@ from RHcontrols import RHcontrols
 from corrections import corrections
 
 from Contacts import allcontacts
-from Contacts import labusers
+from Contacts import labusers as labusers_dict
 
 from testmsgdate import TestmsgDate
-from testmsgdate import Testmsg
 
-from ServerInfo import SMTPaddress
-from ServerInfo import SMTPport
-from ServerInfo import logaddress
-from ServerInfo import fromaddress
-from ServerInfo import username
-from ServerInfo import passwd
+from ServerInfo import *
 
-from LabSettings import instrport
-from LabSettings import pts_hr
-from LabSettings import graphtime
-from LabSettings import tickspacing
-from LabSettings import dpi_set
-from LabSettings import normalstatus_wait
-from LabSettings import TincSet
-from LabSettings import RHincSet
-from LabSettings import graphTmax
-from LabSettings import graphTmin
-from LabSettings import graphRHmax
-from LabSettings import graphRHmin
-from LabSettings import FontsizeLabel
-from LabSettings import FontsizeYticks
-from LabSettings import FontsizeXticks
-from LabSettings import GraphLinewidth
-from LabSettings import rereadT
-from LabSettings import rereadRH
-from LabSettings import figsize_x
-from LabSettings import figsize_y
+from messages import *
+
+from LabSettings import *
 
 #//////////////////////////Import instrument interface\\\\\\\\\\\\\\\\\\\\\\\\\\
-from InstrInterface import ConnectInstr
-from InstrInterface import Instr_errfix
-from InstrInterface import ReadTemperature
-from InstrInterface import ReadHumidity
+from InstrInterface import *
 
 os.chdir(program_directory+'/tmpimg')
 
-correction = copy.deepcopy(corrections.corrections[sensorserial])               #[temperature, humidity]
+correction = copy.deepcopy(corrections[sensorserial])               #[temperature, humidity]
 TestmsgDate = datetime.datetime.strptime(TestmsgDate, "%B %d, %Y %H:%M:%S")
 
 #///////////////////////////Outage Parameter Setup\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
@@ -106,6 +82,7 @@ RHmax = RHcontrols[labID][1]                                                    
 TincAlert = [Tmin - TincSet, Tmax + TincSet]
 RHincAlert = [RHmin - RHincSet, RHmax + RHincSet]
 
+labusers = copy.deepcopy(labusers_dict[labID])
 labcontacts = np.array([])
 for icontact in range(len(labusers)):
     labcontacts = np.append(labcontacts, allcontacts[labusers[icontact]])
@@ -165,7 +142,7 @@ def SendMessageMMS(toaddress, message, img_path):                               
     server.sendmail(fromaddress, toaddress, msg.as_string())
     server.quit()
 
-instr_obj = ConnectInstr()                                                      #connect to instrument
+instr_obj = ConnectInstr(instrport)                                             #connect to instrument
 
 #////////////////////////Variable Initialization\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ## Initialize variables and figure setup
@@ -177,8 +154,8 @@ tf_alert_T = []
 tf_alert_RH = []
 plt.ion()                                                                       #activate interactive plotting
 fig = plt.figure(num=1, figsize=(figsize_x,figsize_y), dpi=dpi_set)             #get matplotlib figure ID, set figure size
-gs = gridspec.GridSpec(2,3)
-gs.update(hspace=0.05)
+gs = gridspec.GridSpec(r_plot, c_plot)
+gs.update(hspace=hspace_set)
 ax1 = plt.subplot(gs[0,:])
 ax2 = plt.subplot(gs[1,:])
 fig.subplots_adjust(left=0.06, right=1, top=0.98, bottom=0.14)
@@ -192,33 +169,33 @@ labstatus_RH = 'normal'
 #check requires at least two values, second acquired in the loop
 #initial temperature
 try:
-    temptemp = ReadTemperature()                                                #read instrument modbus address for temperature
+    temptemp = ReadTemperature(instr_obj)                                                #read instrument modbus address for temperature
 except Exception:                                                               #reestablish connection if failed
-    Instr_errfix()
+    instr_obj = Instr_errfix(instr_obj)
     try:
-        temptemp = ReadTemperature()                                            #read instrumnet modbus address for temperature
+        temptemp = ReadTemperature(instr_obj)                                            #read instrumnet modbus address for temperature
     except Exception:
-        Instr_errfix()
+        instr_obj = Instr_errfix(instr_obj)
         try:
-            temptemp = ReadTemperature()
+            temptemp = ReadTemperature(instr_obj)
         except Exception:
             print('\n'+time.strftime("%Y-%m-%d %H:%M:%S")+' : Communications with instrument failed')
-temperature.append(temptemp)
+temperature.append(temptemp + correction[0])
 
 #initial humidity
 try:
-    temphumid = ReadHumidity()                                                  #read instrument modbus address for humidity
+    temphumid = ReadHumidity(instr_obj)                                                  #read instrument modbus address for humidity
 except Exception:                                                               #reestablish connection if failed
-    Instr_errfix()
+    instr_obj = Instr_errfix(instr_obj)
     try:
-        temphumid = ReadHumidity()                                              #read instrument modbus address for humidity
+        temphumid = ReadHumidity(instr_obj)                                              #read instrument modbus address for humidity
     except Exception:
-        Instr_errfix()
+        instr_obj = Instr_errfix(instr_obj)
         try:
-            temphumid = ReadHumidity()
+            temphumid = ReadHumidity(instr_obj)
         except Exception:
             print('\n'+time.strftime("%Y-%m-%d %H:%M:%S")+' : Communications with instrument failed')
-humidity.append(temphumid)
+humidity.append(temphumid + correction[1])
 
 #initial time data
 currenttime = np.append(currenttime, time.strftime("%Y-%m-%d %H:%M:%S"))        #get current system time (yyyy mm dd hh mm ss)
@@ -231,15 +208,15 @@ while True:
     #//////////////////////////Instrument Communications\\\\\\\\\\\\\\\\\\\\\\\\\\\\
     #read temperature
     try:
-        temptemp = ReadTemperature()                                            #read instrument modbus address for temperature
+        temptemp = ReadTemperature(instr_obj)                                            #read instrument modbus address for temperature
     except Exception:                                                           #reestablish connection if failed
-        Instr_errfix()
+        instr_obj = Instr_errfix(instr_obj)
         try:
-            temptemp = ReadTemperature()                                        #read instrument modbus address for temperature
+            temptemp = ReadTemperature(instr_obj)                                        #read instrument modbus address for temperature
         except Exception:
-            Instr_errfix()
+            instr_obj = Instr_errfix(instr_obj)
             try:
-                temptemp = ReadTemperature()
+                temptemp = ReadTemperature(instr_obj)
             except Exception:
                 print('\n'+time.strftime("%Y-%m-%d %H:%M:%S")+' : Communications with instrument failed')
 
@@ -247,30 +224,30 @@ while True:
     if abs(temptemp - temperature[-1]) > rereadT:
         time.sleep(10)
         try:
-            temptemp = ReadTemperature()                                        #read instrument modbus address for temperature
+            temptemp = ReadTemperature(instr_obj)                                        #read instrument modbus address for temperature
         except Exception:
-            Instr_errfix()
+            instr_obj = Instr_errfix(instr_obj)
             try:
-                temptemp = ReadTemperature()                                    #read instrument modbus address for temperature
+                temptemp = ReadTemperature(instr_obj)                                    #read instrument modbus address for temperature
             except Exception:
-                Instr_errfix()
+                instr_obj = Instr_errfix(instr_obj)
                 try:
-                    temptemp = ReadTemperature()
+                    temptemp = ReadTemperature(instr_obj)
                 except Exception:
                     print('\n'+time.strftime("%Y-%m-%d %H:%M:%S")+' : Communications with instrument failed')
-    temperature.append(temptemp)
+    temperature.append(temptemp + correction[0])
 
     #read humidity
     try:
-        temphumid = ReadHumidity()                                              #read instrument modbus address for humidity
+        temphumid = ReadHumidity(instr_obj)                                              #read instrument modbus address for humidity
     except Exception:                                                           #reestablish connection if failed
-        Instr_errfix()
+        instr_obj = Instr_errfix(instr_obj)
         try:
-            temphumid = ReadHumidity()                                          #read instrument modbus address for humidity
+            temphumid = ReadHumidity(instr_obj)                                          #read instrument modbus address for humidity
         except Exception:
-            Instr_errfix()
+            instr_obj = Instr_errfix(instr_obj)
             try:
-                temphumid = ReadHumidity()
+                temphumid = ReadHumidity(instr_obj)
             except Exception:
                 print('\n'+time.strftime("%Y-%m-%d %H:%M:%S")+' : Communications with instrument failed')
 
@@ -278,18 +255,18 @@ while True:
     if abs(temphumid - humidity[-1]) > rereadRH:
         time.sleep(10)
         try:
-            temphumid = ReadHumidity()                                          #read instrument modbus address for humidity
+            temphumid = ReadHumidity(instr_obj)                                          #read instrument modbus address for humidity
         except Exception:
-            Instr_errfix()
+            instr_obj = Instr_errfix(instr_obj)
             try:
-                temphumid = ReadHumidity()                                      #read instrument modbus address for humidity
+                temphumid = ReadHumidity(instr_obj)                                      #read instrument modbus address for humidity
             except Exception:
-                Instr_errfix()
+                instr_obj = Instr_errfix(instr_obj)
                 try:
-                    temphumid = ReadHumidity()
+                    temphumid = ReadHumidity(instr_obj)
                 except Exception:
                     print('\n'+time.strftime("%Y-%m-%d %H:%M:%S")+' : Communications with instrument failed')
-    humidity.append(temphumid)
+    humidity.append(temphumid + correction[1])
 
     #get and format time
     currenttime = np.append(currenttime, time.strftime("%Y-%m-%d %H:%M:%S"))    #get current system time (yyyy mm dd hh mm ss)
@@ -315,12 +292,11 @@ while True:
     plt.fill_between(np.array(time_vec), np.zeros([len(time_vec),])+Tmax, np.zeros([len(time_vec),])+1000, alpha=0.2, color='lightblue')
     ax1.set_ylim([min(temperature)-graphTmin, max(temperature)+graphTmax])      #y-axis limits
     ax1.ticklabel_format(style='plain')                                         #disable scientific notation on y-axis
-    #plt.ylabel('Temperature (deg. C)', fontsize=4)
     plt.setp(ax1.get_xticklabels(), visible=False)                              #hide tickmarks, will use shared axis
     plt.grid(color='gray', alpha=0.3)
     plt.text(0.05, 0.1, 'Temperature (deg. C)', transform=ax1.transAxes, alpha=0.5, fontsize=FontsizeLabel, color='gray') #add transparent text to bottom left of first axes
     ax1.patch.set_facecolor('black')
-    plt.yticks(fontsize=FontsizeYticks)
+    plt.yticks(np.round(np.linspace(min(temperature)-graphTmin, max(temperature)+graphTmax, nticks_y), 1), fontsize=FontsizeYticks)
     plt.ticklabel_format(useOffset=False)
 
     #plot humidity with temperature's x-axis
@@ -333,17 +309,14 @@ while True:
     plt.fill_between(np.array(time_vec), np.zeros([len(time_vec),])+RHmax, np.zeros([len(time_vec),])+1000, alpha=0.2, color='lightblue')
     ax2.set_ylim([min(humidity)-graphRHmin, max(humidity)+graphRHmax])
     ax2.ticklabel_format(style='plain')
-    #plt.ylabel('Humidity (%RH)', fontsize=4)
     plt.grid(color='gray', alpha=0.3)
     plt.text(0.05, 0.1, 'Humidity (%RH) ', transform=ax2.transAxes, alpha=0.5, fontsize=FontsizeLabel, color='gray')
     ax2.patch.set_facecolor('black')
-    plt.yticks(fontsize=FontsizeYticks)
+    plt.yticks(np.round(np.linspace(min(humidity)-graphRHmin, max(humidity)+graphRHmax, nticks_y), 1), fontsize=FontsizeYticks)
     plt.ticklabel_format(useOffset=False)
 
     #setup xticks
-    plt.xticks(np.arange(min(time_vec), max(time_vec), tick_spacing), axestime[np.arange(min(time_vec), max(time_vec), tick_spacing)], rotation='vertical', fontsize=FontsizeXticks)
-    #plt.xlabel('Time (YYYY-mm-dd hh:mm:ss)')
-    #plt.tight_layout()
+    plt.xticks(np.arange(min(time_vec), max(time_vec), tickspacing_x), axestime[np.arange(min(time_vec), max(time_vec), tickspacing_x)], rotation='vertical', fontsize=FontsizeXticks)
     plt.pause(0.001)
 
     #///////////////////////////////Environment Logs\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
@@ -401,7 +374,7 @@ while True:
     #//////////////////////Communications with outside world\\\\\\\\\\\\\\\\\\\\\\\\
     ## Update NoContact list
     NoContact = []                                                              #reinitialize No Contact list
-    labusers = copy.deepcopy(Contacts.labusers[labID])                          #reinitialize labusers
+    labusers = copy.deepcopy(labusers_dict[labID])                              #reinitialize labusers
     with open(program_directory+'/NoContact.list') as openedfile:
         reader = csv.reader(openedfile, delimiter=',')
         filedata = list(zip(*reader))
@@ -418,7 +391,7 @@ while True:
     comparetime = datetime.datetime.strptime(time.strftime("%B %d, %Y %H:%M:%S"), "%B %d, %Y %H:%M:%S")
     if (TestmsgDate-comparetime) < datetime.timedelta(0,30*60) and (TestmsgDate-comparetime) > datetime.timedelta(0,0): #if 30 minutes prior to sending test message
         if not(TestmsgSent):                                                    #if test message has not been sent
-            message = Testmsg+labID+'. The current system time is '+time.strftime('%a %b %d, %Y, %I.%M %p')+'. The current environment is %.2f' % temperature[-1]+' deg. C and %.2f' % humidity[-1]+' RH.'
+            message = testmsg(labID, temperature, humidity)
             plt.savefig(program_directory+'/tmpimg/outage.jpg')                 #save current figure
             for naddress in range(len(labcontacts)):
                 SendMessageMMS(labcontacts, message, program_directory+'/tmpimg/outage.jpg') #send test message with attached graph
@@ -433,7 +406,7 @@ while True:
         if (temperature[-2] > Tmax) or (temperature[-2] < Tmin):                #if previous temperature was also out of range
             if (labstatus_T == 'normal'):                                       #if lab status was previously normal, or there was an ethernet outage
                 plt.savefig(program_directory+'/tmpimg/outage.jpg')             #save current figure
-                message = 'DMG alert: the temperature for '+labID+' is outside the allowable range [%.2f' % Tmin+', %.2f' % Tmax+'] deg. C. At '+time.strftime('%a %b %d, %Y, %I.%M %p')+' EST the environment was %.2f' % temperature[-1]+' deg. C and %.2f' % humidity[-1]+' RH. The number for plant is 301 975 6928. A message will be sent should the temperature status change.'
+                message = TOUTmsg(labID, Tmin, Tmax, temperature, humidity)
                 msglog = 'Start log for'+labID+'\n\n'+message+'\n'
                 for naddress in range(len(labcontacts)):
                     try:
@@ -441,7 +414,7 @@ while True:
                         msglog = msglog+'\n'+labcontacts[naddress]
                     except Exception:                                           #if cannot reach internet to send messages, continue logging and send outage alert when internet connection resumes
                         if not(ethoutage): #if this is
-                            ethoutage_Toutmessage = 'DMG alert: An internet outage prevented the sending of a recent temperature event. The temperature for '+labID+' was outside the allowable range [%.2f' % Tmin+', %.2f' % Tmax+'] deg. C. At '+time.strftime('%a %b %d, %Y, %I.%M %p')+' EST the environment was %.2f' % temperature[-1]+' deg. C and %.2f' % humidity[-1]+' RH. The number for plant is 301 975 6928. A message will follow should the temperature status have changed during the internet outage.'
+                            ethoutage_Toutmessage = TinternetOUTmsg(labID, Tmin, Tmax, temperature, humidity)
                             msglog = msglog+'\n'+ethoutage_Toutmessage
                         ethoutage = True
                         pass
@@ -461,7 +434,7 @@ while True:
                 TincAlert = [Tmin - TincSet, Tmax + TincSet]                    #reset TincAlert
             elif (temperature[-1] > TincAlert[1]):                              #if temperature increased
                 plt.savefig(program_directory+'/tmpimg/outage.jpg')
-                message = 'DMG alert update: the temperature for '+labID+' has increased. At '+time.strftime('%a %b %d, %Y, %I.%M %p')+' EST the environment was %.2f' % temperature[-1]+' deg. C and %.2f' % humidity[-1]+' RH'
+                message = Tincmsg(labID, Tmin, Tmax, temperature, humidity)
                 msglog = 'Start log for'+labID+'\n\n'+message+'\n'
                 TincAlert[1] = TincAlert[1] + TincSet                           #set new incremental alert parameters
                 TincAlert[0] = TincAlert[1] - 2*TincSet
@@ -471,7 +444,7 @@ while True:
                         msglog = msglog+'\n'+labcontacts[naddress]
                     except Exception:                                           #if cannot reach internet to send messages, continue logging and send outage alert when internet connection resumes
                         if not(ethoutage): #if this is
-                            ethoutage_Toutmessage = 'DMG alert: An internet outage prevented the sending of a recent temperature event. The temperature for '+labID+' was outside the allowable range [%.2f' % Tmin+', %.2f' % Tmax+'] deg. C. At '+time.strftime('%a %b %d, %Y, %I.%M %p')+' EST the environment was %.2f' % temperature[-1]+' deg. C and %.2f' % humidity[-1]+' RH. The number for plant is 301 975 xxxx. A message will follow should the temperature status have changed during the internet outage.'
+                            ethoutage_Toutmessage = TinternetOUTmsg(labID, Tmin, Tmax, temperature, humidity)
                             msglog = msglog+'\n'+ethoutage_Toutmessage
                         ethoutage = True
                         pass
@@ -482,7 +455,7 @@ while True:
                     pass
             elif (temperature[-1] < TincAlert[0]):                              #if temperature decreased
                 plt.savefig(program_directory+'/tmpimg/outage.jpg')
-                message = 'DMG alert update: the temperature for '+labID+' has decreased. At '+time.strftime('%a %b %d, %Y, %I.%M %p')+' EST the environment was %.2f' % temperature[-1]+' deg. C and %.2f' % humidity[-1]+' RH'
+                message = Tdecmsg(labID, Tmin, Tmax, temperature, humidity)
                 msglog = 'Start log for'+labID+'\n\n'+message+'\n'
                 TincAlert[0] = TincAlert[0] - TincSet                           #set new incremental alert parameters
                 TincAlert[1] = TincAlert[0] + 2*TincSet
@@ -492,7 +465,7 @@ while True:
                         msglog = msglog+'\n'+labcontacts[naddress]
                     except Exception:                                           #if cannot reach internet to send messages, continue logging and send outage alert when internet connection resumes
                         if not(ethoutage): #if this is
-                            ethoutage_Toutmessage = 'DMG alert: An internet outage prevented the sending of a recent temperature event. The temperature for '+labID+' was outside the allowable range [%.2f' % Tmin+', %.2f' % Tmax+'] deg. C. At '+time.strftime('%a %b %d, %Y, %I.%M %p')+' EST the environment was %.2f' % temperature[-1]+' deg. C and %.2f' % humidity[-1]+' RH. The number for plant is 301 975 6928. A message will follow should the temperature status have changed during the internet outage.'
+                            ethoutage_Toutmessage = TinternetOUTmsg(labID, Tmin, Tmax, temperature, humidity)
                             msglog = msglog+'\n'+ethoutage_Toutmessage
                         ethoutage = True
                         pass
@@ -521,7 +494,7 @@ while True:
                 tf_alert_T = [time.time()]                                      #set the start of the temperature alert timer
             elif (time.time() - tf_alert_T[0]) > normalstatus_wait*60:          #if normalstatus_wait has passed since temperature alert timer has start/reset
                 plt.savefig(program_directory+'/tmpimg/outage.jpg')             #save current figure
-                message = 'DMG alert update: the temperature for '+labID+' returned to normal at '+time.strftime('%a %b %d, %Y, %I.%M %p')+' EST.'
+                message = TRETURNmsg(labID, Tmin, Tmax, temperature, humidity)
                 msglog = 'Start log for'+labID+'\n\n'+message+'\n'
                 for naddress in range(len(labcontacts)):
                     try:
@@ -529,7 +502,7 @@ while True:
                         msglog = msglog+'\n'+labcontacts[naddress]
                     except Exception:
                         if not(ethoutage):
-                            ethoutage_Tinmessage = 'DMG alert update: the temperature for '+labID+' returned to normal at '+time.strftime('%a %b %d, %Y, %I.%M %p')+' EST.'
+                            ethoutage_Tinmessage = TinternetRETURNmsg(labID, Tmin, Tmax, temperature, humidity)
                             msglog = msglog+'\n'+ethoutage_Tinmessage
                         ethoutage = True
                 print('\n'+time.strftime("%Y-%m-%d %H:%M:%S")+' : Temperature returned to normal...messages sent/queued to users and temperature status reduced')
@@ -559,7 +532,7 @@ while True:
         if (humidity[-2] > RHmax) or (humidity[-2] < RHmin):                    #if previous humidity was also out of range
             if labstatus_RH == 'normal':                                        #if lab status was previously normal
                 plt.savefig(program_directory+'/tmpimg/outage.jpg')             #save current figure
-                message = 'DMG alert: the humidity for '+labID+' is outside the allowable range: [%.2f' % RHmin+', %.2f' % RHmax+'] RH. At '+time.strftime('%a %b %d, %Y, %I.%M %p')+' EST the environment was %.2f' % temperature[-1]+' deg. C and %.2f' % humidity[-1]+' RH. The number for plant is 301 975 6928. A message will be sent should the humidity status change.'
+                message = RHOUTmsg(labID, RHmin, RHmax, temperature, humidity)
                 msglog = 'Start log for'+labID+'\n\n'+message+'\n'
                 for naddress in range(len(labcontacts)):
                     try:
@@ -567,7 +540,7 @@ while True:
                         msglog = msglog+'\n'+labcontacts[naddress]
                     except Exception:
                         if not(ethoutage):
-                            ethoutage_RHoutmessage = 'DMG alert: An internet outage prevented the sending of a recent humidity event. The humidity for '+labID+' was outside the allowable range [%.2f' % Tmin+', %.2f' % Tmax+'] deg. C. At '+time.strftime('%a %b %d, %Y, %I.%M %p')+' EST the environment was %.2f' % temperature[-1]+' deg. C and %.2f' % humidity[-1]+' RH. A message will follow should the humidity status have changed during the internet outage'
+                            ethoutage_RHoutmessage = RHinternetOUTmsg(labID, RHmin, RHmax, temperature, humidity)
                             msglog = msglog+'\n'+ethoutage_RHoutmessage
                         ethoutage = True
                 print('\n'+time.strftime("%Y-%m-%d %H:%M:%S")+' : Humidity outage detected...messages sent/queued to users and humidity status elevated')
@@ -585,7 +558,7 @@ while True:
                 RHincAlert = [RHmin - RHincSet, RHmax + RHincSet]               #reset TincAlert
             elif (humidity[-1] > RHincAlert[1]):                                #if humidity increased
                 plt.savefig(program_directory+'/tmpimg/outage.jpg')
-                message = 'DMG alert update: the humidity for '+labID+' has increased. At '+time.strftime('%a %b %d, %Y, %I.%M %p')+' EST the environment was %.2f' % temperature[-1]+' deg. C and %.2f' % humidity[-1]+' RH'
+                message = RHincmsg(labID, RHmin, RHmax, temperature, humidity)
                 msglog = 'Start log for'+labID+'\n\n'+message+'\n'
                 RHincAlert[1] = RHincAlert[1] + RHincSet                        #set new incremental alert parameters
                 RHincAlert[0] = RHincAlert[1] - 2*RHincSet
@@ -595,7 +568,7 @@ while True:
                         msglog = msglog+'\n'+labcontacts[naddress]
                     except Exception:                                           #if cannot reach internet to send messages, continue logging and send outage alert when internet connection resumes
                         if not(ethoutage): #if this is
-                            ethoutage_RHoutmessage = 'DMG alert: An internet outage prevented the sending of a recent humidity event. The humidity for '+labID+' was outside the allowable range [%.2f' % Tmin+', %.2f' % Tmax+'] deg. C. At '+time.strftime('%a %b %d, %Y, %I.%M %p')+' EST the environment was %.2f' % temperature[-1]+' deg. C and %.2f' % humidity[-1]+' RH. A message will follow should the humidity status have changed during the internet outage.'
+                            ethoutage_RHoutmessage = RHinternetOUTmsg(labID, RHmin, RHmax, temperature, humidity)
                             msglog = msglog+'\n'+ethoutage_RHoutmessage
                         ethoutage = True
                         pass
@@ -606,7 +579,7 @@ while True:
                     pass
             elif (humidity[-1] < RHincAlert[0]):                                #if humidity decreased
                 plt.savefig(program_directory+'/tmpimg/outage.jpg')
-                message = 'DMG alert update: the humidity for '+labID+' has decreased. At '+time.strftime('%a %b %d, %Y, %I.%M %p')+' EST the environment was %.2f' % temperature[-1]+' deg. C and %.2f' % humidity[-1]+' RH'
+                message = RHdecmsg(labID, RHmin, RHmax, temperature, humidity)
                 msglog = 'Start log for'+labID+'\n\n'+message+'\n'
                 RHincAlert[0] = RHincAlert[0] - RHincSet                        #set new incremental alert parameters
                 RHincAlert[1] = RHincAlert[0] + 2*RHincSet
@@ -616,7 +589,7 @@ while True:
                         msglog = msglog+'\n'+labcontacts[naddress]
                     except Exception:                                           #if cannot reach internet to send messages, continue logging and send outage alert when internet connection resumes
                         if not(ethoutage): #if this is
-                            ethoutage_RHoutmessage = 'DMG alert: An internet outage prevented the sending of a recent humidity event. The temperature for '+labID+' was outside the allowable range [%.2f' % Tmin+', %.2f' % Tmax+'] deg. C. At '+time.strftime('%a %b %d, %Y, %I.%M %p')+' EST the environment was %.2f' % temperature[-1]+' deg. C and %.2f' % humidity[-1]+' RH. The number for plant is 301 975 6928. A message will follow should the humidity status have changed during the internet outage.'
+                            ethoutage_RHoutmessage = RHinternetOUTmsg(labID, RHmin, RHmax, temperature, humidity)
                             msglog = msglog+'\n'+ethoutage_RHoutmessage
                         ethoutage = True
                         pass
@@ -643,7 +616,7 @@ while True:
             if len(tf_alert_RH) == 0:                                           #if humidity alert timer has not been set
                 tf_alert_RH = [time.time()]                                     #set the start of the humidity alert timer
             elif (time.time() - tf_alert_RH[0]) > normalstatus_wait*60:         #if normalstatus_wait has passed since humidity alert timer has start/reset
-                message = 'DMG alert update: the humidity for '+labID+' returned to normal at '+time.strftime('%a %b %d, %Y, %I.%M %p')+' EST.'
+                message = RHRETURNmsg(labID, RHmin, RHmax, temperature, humidity)
                 msglog = 'Start log for'+labID+'\n\n'+message+'\n'
                 plt.savefig(program_directory+'/tmpimg/outage.jpg')             #save current figure
                 for naddress in range(len(labcontacts)):
@@ -652,7 +625,7 @@ while True:
                         msglog = msglog+'\n'+labcontacts[naddress]
                     except Exception:
                         if not(ethoutage):
-                            ethoutage_RHinmessage = 'DMG alert update: the humidity for '+labID+' returned to normal at '+time.strftime('%a %b %d, %Y, %I.%M %p')+' EST.'
+                            ethoutage_RHinmessage = RHinternetRETURNmsg(labID, RHmin, RHmax, temperature, humidity)
                             msglog = msglog+'\n'+ethoutage_RHinmessage
                         ethoutage = True
                 print('\n'+time.strftime("%Y-%m-%d %H:%M:%S")+' : Humidity returned to normal...messages sent/queued to users and humidity status reduced')

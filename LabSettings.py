@@ -3,23 +3,31 @@
 instrport = '/dev/ttyUSB0'
 
 ## Display and graph settings
-#display pixels per inch for 5", 800x480 display, default is 186 px/in^2
-dpi_set = 186
+#display pixels per inch for 5", 800x480 display, default is 190 px/in^2
+dpi_set = 190
+#vertical space between figures, % of vertical pixels, default is 0.07
+hspace_set = 0.07
+#number of rows of subplots, default is 2: one for temperature, one for humidity
+r_plot = 2
+#number of columns of subplots, default is 1
+c_plot = 1
 #figure size of the graphs in inches. Default values are for using a 800x480 pixel 5" display.
 figsize_x = 4.2
 figsize_y = 2.2
 #length of time to graph into past, hours, default is 12 hours
 graphtime = 12
-#amount of space to graph above maximum temperature in graph time range, deg. C
+#amount of space to graph above maximum temperature in graph time range, deg. C. Keep greater than 0.05 deg. C, too small will cause y-axis ticks to appear equal when using a low number of y-ticks
 graphTmax = 0.5
-#amount of space to graph below minimum temperature in graph time range, deg. C
+#amount of space to graph below minimum temperature in graph time range, deg. C. Keep greater than 0.05 deg. C, too small will cause y-axis ticks to appear equal when using a low number of y-ticks
 graphTmin = 0.5
-#amount of space to graph above maximum humidity in graph time range, %RH. 100 sets maximum displays humidity to 100 %RH with no autoscaling
+#amount of space to graph above maximum humidity in graph time range, %RH. Keep greater than 0.05 %RH, too small will cause y-axis ticks to appear equal when using a low number of y-ticks
 graphRHmax = 1
-#amount of space to graph below minimum humidity in graph time range, %RH. 100 sets minimum displays humidity to 0 %RH with no autoscaling
+#amount of space to graph below minimum humidity in graph time range, %RH. Keep greater than 0.05 %RH, too small will cause y-axis ticks to appear equal when using a low number of y-ticks
 graphRHmin = 1
 #number of points between each x-axis tickmark, default is 20 points per tick
-tickspacing = 20
+tickspacing_x = 20
+#numbter of ticks on the y-axis, default is 3 tickmarks
+nticks_y = 3
 #fontsize for graph label text, Temperature (deg.C) amd Humidity (RH) text
 FontsizeLabel = 16
 #fontsize for graph y-axis humidity and temperature values
