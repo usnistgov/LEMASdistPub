@@ -1,41 +1,38 @@
-#LEMASRun.py
-#   Tested with Python 3.6.1 (Anaconda 4.4.0 stack) on Linux Mint 18.2 Sonya Cinnamon, Python 3.4.2, on Raspbian Linux
-#
-#///////////////////////////////////////////////////////////////////////////////
-## LEMASRun.py Notes
-#   August, 2017
-#   Authored by: Michael Braine, Physical Science Technician, NIST, Gaithersburg, MD
-#       PHONE: 301 975 8746
-#       EMAIL: michael.braine@nist.gov (use this instead of phone)
-#
-#   Purpose
-#       continuously read temperature and humidity from instrument, send notification via text/email with graph attached to lab users if temperature or humidity is outside of specified limits
-#       log temperature and humidity to <month><YYYY>-all.env.csv
-#       log temperature and humidity outages to <month><YYYY>-outage.env.csv
-#
-#///////////////////////////////////////////////////////////////////////////////
-## References
-#       none
-#
-##///////////////////////////////////////////////////////////////////////////////
-## Change log from v1.11 to v1.12
-#   May 30, 2018
-#
-#   ver 1.12    - moved server information into .py file to easily edit in the public distribution
-#               - moved instrument interface into .py file to  easily edit in the public distribution
-#               - moved messages into .py file to easily edit in the public distribution
-#               - added variable for number of tickmarks on y-axis
-#
-#///////////////////////////////////////////////////////////////////////////////
+"""
+LEMASRunQuiet.py
+  Tested with Python 3.6.1 (Anaconda 4.4.0 stack) on Linux Mint 18.2 Sonya Cinnamon, Python 3.4.2, on Raspbian Linux
 
-import smtplib, time, os, csv, datetime, copy
-print('\n'+time.strftime("%Y-%m-%d %H:%M:%S")+' : Starting Laboratory Environment Monitoring and Alert System (LEMAS)')
+///////////////////////////////////////////////////////////////////////////////
+LEMASRun.py Notes
+  August, 2017
+  Authored by: Michael Braine, Physical Science Technician, NIST, Gaithersburg, MD
+      PHONE: 301 975 8746
+      EMAIL: michael.braine@nist.gov (use this instead of phone)
 
-install_location = os.path.dirname(os.path.realpath(__file__))
-with open(install_location+'/version', 'r') as fin:
-    print(fin.read()+'\n\nQuietMode')
+Purpose
+      continuously read temperature and humidity from instrument, send notification via text/email with graph attached to lab users if temperature or humidity is outside of specified limits
+      log temperature and humidity to <month><YYYY>-all.env.csv
+      log temperature and humidity outages to <month><YYYY>-outage.env.csv
 
-## import python libraries
+///////////////////////////////////////////////////////////////////////////////
+References
+      none
+
+///////////////////////////////////////////////////////////////////////////////
+Change log from v1.12 to v1.13
+  July 2, 2018
+
+  ver 1.13    -Various rewrites to comply with PEP8
+
+///////////////////////////////////////////////////////////////////////////////
+"""
+#pylint: disable=W0703, E0401, C0413, W0401
+import smtplib
+import time
+import os
+import csv
+import datetime
+import copy
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
@@ -43,9 +40,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
+print('\n'+time.strftime("%Y-%m-%d %H:%M:%S")+' : Starting Laboratory Environment Monitoring and Alert System (LEMAS)')
+install_location = os.path.dirname(os.path.realpath(__file__))
+with open(install_location+'/version', 'r') as fin:
+    print(fin.read()+'\n\nLoudMode')
 os.chdir(install_location)
 
-#//////////////////////////Import various configurations\\\\\\\\\\\\\\\\\\\\\\\\
 from LabID import labID
 from SensorSerial import sensorserial
 from Tcontrols import Tcontrols
@@ -63,7 +63,6 @@ from messages import *
 
 from LabSettings import *
 
-#//////////////////////////Import instrument interface\\\\\\\\\\\\\\\\\\\\\\\\\\
 from InstrInterface import *
 
 correction = copy.deepcopy(corrections[sensorserial])                           #[temperature, humidity]
@@ -82,8 +81,8 @@ RHincAlert = [RHmin - RHincSet, RHmax + RHincSet]
 
 labusers = copy.deepcopy(labusers_dict[labID])
 labcontacts = np.array([])
-for icontact in range(len(labusers)):
-    labcontacts = np.append(labcontacts, allcontacts[labusers[icontact]])
+for icontact, labuser in enumerate(labusers):
+    labcontacts = np.append(labcontacts, allcontacts[labuser])
 
 TestmsgSent = False                                                             #initialize test message has not been sent
 ethoutage = False                                                               #initialize with internet outage status as false
@@ -92,6 +91,9 @@ ethoutage_sent = False                                                          
 #///////////////////////////Function Definitions\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 #define message sending functions
 def SendMessage(toaddress, message):                                            #function for sending regular messages
+    """
+    Internal function for sending text-only messages (SMS).
+    """
     msg = MIMEMultipart()                                                       #define msg as having multiple components
     msg['Subject'] = 'DMG Alert: '+labID+' event log'
     msg['From'] = fromaddress
@@ -104,9 +106,9 @@ def SendMessage(toaddress, message):                                            
         server.starttls()
     except Exception:
         print('Looks like your SMTP server may not support TLS. Continuing to send message without it.')
-    if len(username) != 0:
+    if not username:
         try:
-            server.login(username, passwd)
+            server.login(username, password)
         except Exception:
             print('Either your username and/or password is incorrect, or you do not need to log in to your SMTP server to send messages.')
             print('If a message is received, then no login is needed and you can leave username and password blank.')
@@ -114,6 +116,9 @@ def SendMessage(toaddress, message):                                            
     server.quit()
 
 def SendMessageMMS(toaddress, message, img_path):                               #function for sending messages with image attached
+    """
+    Internal function for sending text messages with image attachments (MMS).
+    """
     msg = MIMEMultipart()                                                       #define msg as having multiple components
     msg['Subject'] = 'DMG Alert: '+labID+' Environment Event'
     msg['From'] = fromaddress
@@ -129,9 +134,9 @@ def SendMessageMMS(toaddress, message, img_path):                               
         server.starttls()
     except Exception:
         print('Looks like your SMTP server may not support TLS. Continuing to send message without it.')
-    if len(username) != 0:
+    if not username:
         try:
-            server.login(username, passwd)
+            server.login(username, password)
         except Exception:
             print('Either your username and/or password is incorrect, or you do not need to log in to your SMTP server to send messages.')
             print('If a message is received, then no login is needed and you can leave username and password blank.')
@@ -150,11 +155,11 @@ humidity = []
 tf_alert_T = []
 tf_alert_RH = []
 plt.ion()                                                                       #activate interactive plotting
-fig = plt.figure(num=1, figsize=(figsize_x,figsize_y), dpi=dpi_set)             #get matplotlib figure ID, set figure size
+fig = plt.figure(num=1, figsize=(figsize_x, figsize_y), dpi=dpi_set)             #get matplotlib figure ID, set figure size
 gs = gridspec.GridSpec(r_plot, c_plot)
 gs.update(hspace=hspace_set)
-ax1 = plt.subplot(gs[0,:])
-ax2 = plt.subplot(gs[1,:])
+ax1 = plt.subplot(gs[0, :])
+ax2 = plt.subplot(gs[1, :])
 fig.subplots_adjust(left=0.06, right=1, top=0.98, bottom=0.14)
 fig.canvas.toolbar.pack_forget()
 labstatus_T = 'normal'
@@ -280,7 +285,7 @@ while True:
     time_vec = range(len(axestime))
 
     #plot temperature
-    ax1 = plt.subplot(gs[0,:])
+    ax1 = plt.subplot(gs[0, :])
     plt.cla()
     plt.plot(time_vec, temperature, 'r-', linewidth=GraphLinewidth)
     plt.plot(time_vec, np.zeros([len(time_vec),])+Tmin, 'b-', linewidth=0.25)
@@ -297,7 +302,7 @@ while True:
     plt.ticklabel_format(useOffset=False)
 
     #plot humidity with temperature's x-axis
-    ax2 = plt.subplot(gs[1,:], sharex=ax1)
+    ax2 = plt.subplot(gs[1, :], sharex=ax1)
     plt.cla()
     plt.plot(time_vec, humidity, 'g-', linewidth=GraphLinewidth)
     plt.plot(time_vec, np.zeros([len(time_vec),])+RHmin, 'b-', linewidth=0.25)
@@ -319,7 +324,7 @@ while True:
     #///////////////////////////////Environment Logs\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
     ## Data file management
     #Create EnvironmentData directory if it does not exist
-    if not(os.path.isdir(envdata_directory)):
+    if not os.path.isdir(envdata_directory):
         os.makedirs(envdata_directory)
 
     ## Read csv and append to end of file
@@ -362,9 +367,9 @@ while True:
             envfile.write(','+str(humidity[-1]))                                #add latest humidity
         #Record outage type
         if (temperature[-1] > Tmax) or (temperature[-1] < Tmin):
-                envfile.write(',TEMPERATURE OUTAGE,')
+            envfile.write(',TEMPERATURE OUTAGE,')
         if (humidity[-1] > RHmax) or (humidity[-1] < RHmin):
-                envfile.write(', ,HUMIDITY OUTAGE')
+            envfile.write(', ,HUMIDITY OUTAGE')
         envfile.write('\n')
         envfile.close()
     tf = time.time()                                                            #stop timer---------------------------------------------------------------------------

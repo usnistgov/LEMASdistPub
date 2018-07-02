@@ -1,3 +1,12 @@
+"""
+Various device-specific settings
+"""
+
+#where recorded data will be stored in Linux file system, create if doesn't exist, doesn't really ever need changed
+#the purpose of getpass.getuser() is to get the current username
+import getpass                                                                  #for getting the current username to create save directory string
+envdata_directory = '/home/'+getpass.getuser()+'/Desktop/EnvironmentData'
+
 #set communications port. On Raspbian for USB-to-serial it should be /dev/ttyUSB0 (check dmesg immediately after connecting USB), default = /dev/ttyUSB0
 #if using GPIO, some modification will be needed to LEMASRun* scripts
 instrport = '/dev/ttyUSB0'

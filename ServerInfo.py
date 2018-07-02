@@ -1,4 +1,6 @@
-# Variables for setting up sending of messages through SMTP server
+"""
+Variables for setting up sending of messages through SMTP server
+"""
 #defines the IP address and port of the SMTP server for sending messages through. E.g. google is smtp.gmail.com on port 465
 SMTPaddress = '129.6.16.94'
 #SMTPaddress = 'smtp.gmail.com'                                                  #for gmail
