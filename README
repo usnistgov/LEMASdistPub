@@ -41,8 +41,8 @@ For Linux-based platforms:
    installed (for Debian-based OS: sudo apt install git):
        git clone https://github.com/usnistgov/LEMASdistPub /home/$USER/LEMASdist/
 
-2) AFTER using setup-LEMAS or manually configuring each file (see Setup), cd to /home/<user> and run the following command to install
-   necessary files to each device.
+2) AFTER using setup-LEMAS or manually configuring each file (see Setup), cd to
+   /home/<user> and run the following command to install necessary files to each device.
 
 
 Setup and Customization
