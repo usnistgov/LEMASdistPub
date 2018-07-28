@@ -45,7 +45,7 @@ For Linux-based platforms:
    necessary files to each device.
 
 
-Setup
+Setup and Customization
 --------------------------------------------------------------------------------
 Various files need to be configured prior to distributing the system to your devices
 to make the system behave as you need.
