@@ -1,0 +1,105 @@
+Author: Michael Braine, NIST, Physical Science Technician
+        michael.braine@nist.gov
+        July 28, 2017
+
+
+What is LEMAS?
+--------------------------------------------------------------------------------
+LEMAS (Laboratory Environment Monitoring and Alert System) is a system for
+logging environmental conditions within a space and reporting on the conditions
+using pre-defined limits to specified users through text messages (SMS and MMS)
+and email.
+The open-nature allows ease of grabbing and sharing data, or extending the functionality
+of each device/system. E.g., need to monitor the concentration of a gas? Add
+the appropriate sensor, construct the communication interface in InstrInterface.py,
+and add the alert scripts. (this will be made easily extendable in the future if
+enough users and interest through iterable files)
+LEMAS is designed to operate on a Raspberry Pi 3 because of low heat addition
+to the environment and its small size, but will likely operate on any Linux system
+with exclusion of the files under the LEMASpi directory. It very well may run on
+any Windows system, assuming log paths are modified to resemble Windows structure.
+
+If you end up using the system, have issues getting it set up, or want to make a
+contribution or improvement, send me an email! I thrive from feedback.
+
+
+Requirements
+--------------------------------------------------------------------------------
+-Python >= 3.6
+-numpy
+-matplotlib
+-pyserial (optional, for communicating with serial-based sensors)
+-minimalmodbus (optional, for communicating with modbus-based sensors)
+
+
+Installation
+--------------------------------------------------------------------------------
+For Linux-based platforms:
+1) Unpack and copy unpacked directory to /home/$USER/LEMASdist/
+   Alternatively,
+   Using a terminal, cd to /home/<user>/ and run the git command. Git may need
+   installed (for Debian-based OS: sudo apt install git):
+       git clone https://github.com/usnistgov/LEMASdistPub /home/$USER/LEMASdist/
+
+2) AFTER using setup-LEMAS or manually configuring each file (see Setup), cd to /home/<user> and run the following command to install
+   necessary files to each device.
+
+
+Setup
+--------------------------------------------------------------------------------
+Various files need to be configured prior to distributing the system to your devices
+to make the system behave as you need.
+For ease, the shell script setup-LEMAS is included. Manually configuring each file
+is possible. To run the shell script, cd to /home/<user>/ and use: sh setup-LEMAS
+
+To manually set up the system, the following files need configured according to
+their respective comments:
+Contacts.py       - define contacts and contact information
+InstrInterface.py - instructions to communicate with sensors
+LabID.py          - unique for each space, identifies the device
+RHcontrols.py     - thresholds for humidity alerts for all spaces
+Tcontrols.py      - thresholds for temperature alerts for all spaces
+ServerInfo.py     - defines the IP address of a SMTP server used to send messages
+corrections.py    - (somewhat optional) defines corrections to make for each sensor
+SensorSerial.py   - (somewhat optional) unique for each space, identifies the device's
+                    sensor and corresponding corrections. leave string empty for no correction
+
+Optional settings
+LabSettings.py    - (optional) mostly variables to customize graphs
+NoContact.list    - (optional) defines users to not send messages to
+messages.py       - (optional) defines what messages will say under each environment condition
+testmsgdate.py    - (optional) defines date and time which a test message will be sent to all users
+
+
+After setting up the system, distribute all files to each device at /home/<user>/LEMASdist.
+
+Using a Raspberry Pi, in the case of a power outage, each device can be made to
+begin logging and sending messages again once power is restored. This does require
+automatic logging in to a default user, though. To set up automatic logging on reboot,
+use in a terminal:
+    echo "@lxterminal -e /usr/bin/python3 /home/$USER/LEMASdist/LEMASRun.py" >> /home/$USER/.config/lxsession/LXDE-pi/autostart
+
+This instructs the OS to launch a terminal using lxterminal which will then execute
+python3 LEMASRun.py. lxterminal is specific to Raspbian OS. A similar setup can be
+made on other Linux OS.
+
+To silence a space from setting messages, copy LEMASRunQuiet.py to LEMASRun.py,
+overwriting LEMASRun.py. The script LEMASRun.py will need its process killed and started again
+for the change to take effect. Alternatively, reboot the system.
+To enable messages from a space again, copy LEMASRunLoud.py to LEMASRun.py,
+overwriting LEMASRun.py. The script LEMASRun.py will need its process killed and started again
+for the change to take effect. Alternatively, reboot the system.
+
+
+Launching the System
+--------------------------------------------------------------------------------
+It is advisable to operate the system from a single master system, particularly when
+operating many devices. Use Linux's ssh command to connect to each system remotely
+to make modifications to settings or Linux's scp command to transfer files. The ssh
+and scp commands can be automated with a shell script after setting up RSA credentials
+with each device. See https://github.com/usnistgov/LEMASmaster for an example of a master
+system setup, in addition to automating downloading the data to the master system and
+hosting a website to analyze and post the data.
+
+To launch the system, on each device cd to /home/<user>/LEMASdist and use in a terminal:
+    sh LEMASRun.py
