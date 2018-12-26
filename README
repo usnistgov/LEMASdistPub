@@ -97,7 +97,7 @@ It is advisable to operate the system from a single master system, particularly 
 operating many devices. Use Linux's ssh command to connect to each system remotely
 to make modifications to settings or Linux's scp command to transfer files. The ssh
 and scp commands can be automated with a shell script after setting up RSA credentials
-with each device. See https://github.com/usnistgov/LEMASmaster for an example of a master
+with each device. See https://github.com/TheMetrologist/LEMASmaster for an example of a master
 system setup, in addition to automating downloading the data to the master system and
 hosting a website to analyze and post the data.
 
